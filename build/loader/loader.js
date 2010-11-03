@@ -16,7 +16,7 @@ if (!YUI.Env[Y.version]) {
             GALLERY_VERSION = 'gallery-2010.10.20-19-33',
             TNT = '2in3',
             TNT_VERSION = '4',
-            YUI2_VERSION = '2.8.1',
+            YUI2_VERSION = '2.8.2',
             COMBO_BASE = CDN_BASE + 'combo?',
             META = { version: VERSION,
                               root: ROOT,
@@ -55,7 +55,7 @@ if (!YUI.Env[Y.version]) {
             comboBase: COMBO_BASE,
             update: galleryUpdate,
             patterns: { 'gallery-': { },
-                         'gallerycss-': { type: 'css' } }
+                        'gallerycss-': { type: 'css' } }
         };
 
         groups.yui2 = {
@@ -934,10 +934,14 @@ Y.Loader.prototype = {
      *           e.g., ["en-GB","zh-Hans-CN"]</dd>
      *     <dt>condition:</dt>
      *       <dd>Specifies that the module should be loaded automatically if
-     *           a condition is met.  This is an object with two fields:
+     *           a condition is met.  This is an object with up to three fields:
      *           [trigger] - the name of a module that can trigger the auto-load
      *           [test] - a function that returns true when the module is to be
      *           loaded.
+     *           [when] - specifies the load order of the conditional module
+     *           with regard to the position of the trigger module.
+     *           This should be one of three values: 'before', 'after', or
+     *           'instead'.  The default is 'after'.
      *       </dd>
      * </dl>
      * @method addModule
@@ -972,7 +976,7 @@ Y.Loader.prototype = {
         // Handle submodule logic
         var subs = o.submodules, i, l, sup, s, smod, plugins, plug,
             j, langs, packName, supName, flatSup, flatLang, lang, ret,
-            overrides, skinname,
+            overrides, skinname, triggermod, when,
             conditions = this.conditions, trigger;
             // , existing = this.moduleInfo[name], newr;
 
@@ -1086,10 +1090,30 @@ Y.Loader.prototype = {
 
         if (o.condition) {
             trigger = o.condition.trigger;
+            when = o.condition.when;
             conditions[trigger] = conditions[trigger] || {};
             conditions[trigger][name] = o.condition;
-            o.after = o.after || [];
-            o.after.push(trigger);
+            // the 'when' attribute can be 'before', 'after', or 'instead'
+            // the default is after.
+            if (when && when != 'after') {
+                if (when == 'instead') { // replace the trigger
+                    o.supersedes = o.supersedes || [];
+                    o.supersedes.push(trigger);
+                } else { // before the trigger
+                    // the trigger requires the conditional mod,
+                    // so it should appear before the conditional
+                    // mod if we do not intersede.
+                    //
+                    // triggermod = this.getModule(trigger);
+                    // if (triggermod) {
+                    //     triggermod.after = triggermod.after || [];
+                    //     triggermod.after.push(name);
+                    // }
+                }
+            } else { // after the trigger
+                o.after = o.after || [];
+                o.after.push(trigger);
+            }
         }
 
         if (o.after) {
@@ -1245,7 +1269,6 @@ Y.Loader.prototype = {
                         hash[condmod] = true;
                         d.push(condmod);
                         m = this.getModule(condmod);
-                        // console.log('conditional', m);
                         if (m) {
                             add = this.getRequires(m);
                             for (j = 0; j < add.length; j++) {
@@ -2723,7 +2746,10 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
             "datatable-base": {
                 "requires": [
                     "recordset-base", 
-                    "widget"
+                    "widget", 
+                    "intl", 
+                    "substitute", 
+                    "event-mouseenter"
                 ], 
                 "skinnable": true
             }, 
@@ -2933,6 +2959,16 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
             }
         }
     }, 
+    "dial": {
+        "requires": [
+            "widget", 
+            "dd-drag", 
+            "substitute", 
+            "event-mouseenter", 
+            "transition"
+        ], 
+        "skinnable": true
+    }, 
     "dom": {
         "plugins": {
             "dom-deprecated": {
@@ -3010,13 +3046,17 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "frame", 
                     "node", 
                     "exec-command", 
-                    "selection", 
-                    "editor-para"
+                    "selection"
                 ]
             }, 
             "editor-bidi": {
                 "requires": [
                     "editor-base"
+                ]
+            }, 
+            "editor-br": {
+                "requires": [
+                    "node"
                 ]
             }, 
             "editor-lists": {
@@ -3882,7 +3922,7 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
         }
     }
 };
-YUI.Env[Y.version].md5 = 'af1573f6ac04ae5ef7081158a7a6a310';
+YUI.Env[Y.version].md5 = '2f531a82a518eb3682f9a04bf1eaa329';
 
 
 }, '@VERSION@' ,{requires:['loader-base']});

@@ -11,8 +11,8 @@ var YLang = Y.Lang,
     
     FOCUS = "focus",
     KEYDOWN = "keydown",
-    MOUSEOVER = "mouseover",
-    MOUSEOUT = "mouseout",
+    MOUSEENTER = "mouseenter",
+    MOUSELEAVE = "mouseleave",
     MOUSEUP = "mouseup",
     MOUSEDOWN = "mousedown",
     CLICK = "click",
@@ -24,6 +24,8 @@ var YLang = Y.Lang,
     CLASS_LINER = YgetClassName(DATATABLE, "liner"),
     CLASS_FIRST = YgetClassName(DATATABLE, "first"),
     CLASS_LAST = YgetClassName(DATATABLE, "last"),
+    CLASS_EVEN = YgetClassName(DATATABLE, "even"),
+    CLASS_ODD = YgetClassName(DATATABLE, "odd"),
 
     TEMPLATE_TABLE = '<table></table>',
     TEMPLATE_COL = '<col></col>',
@@ -1112,15 +1114,66 @@ Y.extend(DTBase, Y.Widget, {
         // event facades.
         //TODO: do we need queuable=true?
         //TODO: All the other events.
+        /**
+         * Fired when a TH element has a click.
+         *
+         * @event theadCellClick
+         */
         this.publish("theadCellClick", {defaultFn: this._defTheadCellClickFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a THEAD>TR element has a click.
+         *
+         * @event theadRowClick
+         */
         this.publish("theadRowClick", {defaultFn: this._defTheadRowClickFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the THEAD element has a click.
+         *
+         * @event theadClick
+         */
         this.publish("theadClick", {defaultFn: this._defTheadClickFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TH element has a mouseenter.
+         *
+         * @event theadCellMouseenter
+         */
+        this.publish("theadCellMouseenter", {defaultFn: this._defTheadCellMouseenterFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a THEAD>TR element has a mouseenter.
+         *
+         * @event theadRowMouseenter
+         */
+        this.publish("theadRowMouseenter", {defaultFn: this._defTheadRowMouseenterFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the THEAD element has a mouseenter.
+         *
+         * @event theadMouseenter
+         */
+        this.publish("theadMouseenter", {defaultFn: this._defTheadMouseenterFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TD element has a click.
+         *
+         * @event tbodyCellClick
+         */
+        this.publish("tbodyCellClick", {defaultFn: this._defTbodyCellClickFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY>TR element has a click.
+         *
+         * @event tbodyRowClick
+         */
+        this.publish("tbodyRowClick", {defaultFn: this._defTbodyRowClickFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the TBODY element has a click.
+         *
+         * @event tbodyClick
+         */
+        this.publish("tbodyClick", {defaultFn: this._defTbodyClickFn, emitFacade:false, queuable:true});
 
         // Bind to THEAD DOM events
         tableNode.delegate(FOCUS, this._onDomEvent, theadFilter, this, "theadCellFocus");
         tableNode.delegate(KEYDOWN, this._onDomEvent, theadFilter, this, "theadCellKeydown");
-        tableNode.delegate(MOUSEOVER, this._onDomEvent, theadFilter, this, "theadCellMousedown");
-        tableNode.delegate(MOUSEOUT, this._onDomEvent, theadFilter, this, "theadCellMouseout");
+        tableNode.delegate(MOUSEENTER, this._onDomEvent, theadFilter, this, "theadCellMouseenter");
+        tableNode.delegate(MOUSELEAVE, this._onDomEvent, theadFilter, this, "theadCellMouseleave");
         tableNode.delegate(MOUSEUP, this._onDomEvent, theadFilter, this, "theadCellMouseup");
         tableNode.delegate(MOUSEDOWN, this._onDomEvent, theadFilter, this, "theadCellMousedown");
         tableNode.delegate(CLICK, this._onDomEvent, theadFilter, this, "theadCellClick");
@@ -1130,8 +1183,8 @@ Y.extend(DTBase, Y.Widget, {
         // Bind to TBODY DOM events
         tableNode.delegate(FOCUS, this._onDomEvent, tbodyFilter, this, "tbodyCellFocus");
         tableNode.delegate(KEYDOWN, this._onDomEvent, tbodyFilter, this, "tbodyCellKeydown");
-        tableNode.delegate(MOUSEOVER, this._onDomEvent, tbodyFilter, this, "tbodyCellMouseover");
-        tableNode.delegate(MOUSEOUT, this._onDomEvent, tbodyFilter, this, "tbodyCellMouseout");
+        tableNode.delegate(MOUSEENTER, this._onDomEvent, tbodyFilter, this, "tbodyCellMouseenter");
+        tableNode.delegate(MOUSELEAVE, this._onDomEvent, tbodyFilter, this, "tbodyCellMouseleave");
         tableNode.delegate(MOUSEUP, this._onDomEvent, tbodyFilter, this, "tbodyCellMouseup");
         tableNode.delegate(MOUSEDOWN, this._onDomEvent, tbodyFilter, this, "tbodyCellMousedown");
         tableNode.delegate(CLICK, this._onDomEvent, tbodyFilter, this, "tbodyCellClick");
@@ -1141,8 +1194,8 @@ Y.extend(DTBase, Y.Widget, {
         // Bind to message TBODY DOM events
         tableNode.delegate(FOCUS, this._onDomEvent, msgFilter, this, "msgCellFocus");
         tableNode.delegate(KEYDOWN, this._onDomEvent, msgFilter, this, "msgCellKeydown");
-        tableNode.delegate(MOUSEOVER, this._onDomEvent, msgFilter, this, "msgCellMouseover");
-        tableNode.delegate(MOUSEOUT, this._onDomEvent, msgFilter, this, "msgCellMouseout");
+        tableNode.delegate(MOUSEENTER, this._onDomEvent, msgFilter, this, "msgCellMouseenter");
+        tableNode.delegate(MOUSELEAVE, this._onDomEvent, msgFilter, this, "msgCellMouseleave");
         tableNode.delegate(MOUSEUP, this._onDomEvent, msgFilter, this, "msgCellMouseup");
         tableNode.delegate(MOUSEDOWN, this._onDomEvent, msgFilter, this, "msgCellMousedown");
         tableNode.delegate(CLICK, this._onDomEvent, msgFilter, this, "msgCellClick");
@@ -1466,8 +1519,16 @@ Y.extend(DTBase, Y.Widget, {
         var tbody = o.tbody,
             tr = o.tr,
             index = o.rowindex,
-            nextSibling = tbody.get("children").item(index) || null;
-
+            nextSibling = tbody.get("children").item(index) || null,
+            isEven = (index%2===0);
+            
+        if(isEven) {
+            tr.replaceClass(CLASS_ODD, CLASS_EVEN);
+        }
+        else {
+            tr.replaceClass(CLASS_EVEN, CLASS_ODD);
+        }
+        
         tbody.insertBefore(tr, nextSibling);
     },
 
@@ -1528,7 +1589,7 @@ Y.extend(DTBase, Y.Widget, {
 Y.namespace("DataTable").Base = DTBase;
 
 
-}, '@VERSION@' ,{lang:['en'], requires:['intl','substitute','widget','recordset-base']});
+}, '@VERSION@' ,{requires:['intl','substitute','widget','recordset-base'], lang:['en']});
 YUI.add('datatable-sort', function(Y) {
 
 /**
@@ -1551,10 +1612,10 @@ var YgetClassName = Y.ClassNameManager.getClassName,
     
     CLASS_ASC = YgetClassName(DATATABLE, "asc"),
     CLASS_DESC = YgetClassName(DATATABLE, "desc"),
-    CLASS_SORTABLE = YgetClassName("datatable", "sortable"),
+    CLASS_SORTABLE = YgetClassName(DATATABLE, "sortable"),
 
     //TODO: Don't use hrefs - use tab/arrow/enter
-    TEMPLATE_TH_LINK = '<a class="{link_class}" title="{link_title}" href="{link_href}">{value}</a>';
+    TEMPLATE = '<a class="{link_class}" title="{link_title}" href="{link_href}">{value}</a>';
 
 
 function DataTableSort() {
@@ -1616,6 +1677,16 @@ Y.mix(DataTableSort, {
         */
         sortedBy: {
             value: null
+        },
+        
+        /**
+        * @attribute template
+        * @description Tokenized markup template for TH sort element.
+        * @type String
+        * @default '<a class="{link_class}" title="{link_title}" href="{link_href}">{value}</a>'
+        */
+        template: {
+            value: TEMPLATE
         }
     }
 });
@@ -1626,13 +1697,6 @@ Y.mix(DataTableSort, {
 //
 /////////////////////////////////////////////////////////////////////////////
 Y.extend(DataTableSort, Y.Plugin.Base, {
-    /**
-    * @property thLinkTemplate
-    * @description Tokenized markup template for TH click-to-sort link creation.
-    * @type String
-    * @default '<a class="{link_class}" title="{link_title}" href="{link_href}">{value}</a>'
-    */
-    thLinkTemplate: TEMPLATE_TH_LINK,
 
     /////////////////////////////////////////////////////////////////////////////
     //
@@ -1656,10 +1720,12 @@ Y.extend(DataTableSort, Y.Plugin.Base, {
         
         // Add class
         this.doBefore("_attachTheadThNode", function(o) {
-           o.th.addClass(CLASS_SORTABLE);
+            if(o.column.get("sortable")) {
+                o.th.addClass(CLASS_SORTABLE);
+            }
         });
 
-        // Attach click handlers
+        // Attach trigger handlers
         dt.on(this.get("trigger"), this._onEventSortColumn);
 
         // Attach UI hooks
@@ -1691,7 +1757,7 @@ Y.extend(DataTableSort, Y.Plugin.Base, {
     */
     _beforeCreateTheadThNode: function(o) {
         if(o.column.get("sortable")) {
-            o.value = Y.substitute(this.thLinkTemplate, {
+            o.value = Y.substitute(this.get("template"), {
                 link_class: "foo",
                 link_title: "bar",
                 link_href: "bat",
@@ -1731,64 +1797,7 @@ Y.namespace("Plugin").DataTableSort = DataTableSort;
 
 
 
-}, '@VERSION@' ,{requires:['plugin','datatable-base','recordset-sort'], lang:['en']});
-YUI.add('datatable-colresize', function(Y) {
-
-var GETCLASSNAME = Y.ClassNameManager.getClassName,
-
-    DATATABLE = "datatable",
-
-    //CLASS_RESIZEABLE = GETCLASSNAME(DATATABLE, "resizeable"),
-    CLASS_LINER = GETCLASSNAME(DATATABLE, "liner"),
-    TEMPLATE_LINER = '<div class="'+CLASS_LINER+'">{value}</div>';
-
-function DataTableColResize() {
-    DataTableColResize.superclass.constructor.apply(this, arguments);
-}
-
-Y.mix(DataTableColResize, {
-
-    NS: "colresize",
-
-    NAME: "dataTableColResize",
-
-    ATTRS: {
-
-    }
-});
-
-Y.extend(DataTableColResize, Y.Plugin.Base, {
-    thLinerTemplate: TEMPLATE_LINER,
-
-    tdLinerTemplate: TEMPLATE_LINER,
-
-    initializer: function(config) {
-        this.get("host").thTemplate = Y.substitute(this.get("host").thTemplate, {value: this.thLinerTemplate});
-        this.get("host").tdTemplate = Y.substitute(this.get("host").tdTemplate, {value: this.tdLinerTemplate});
-
-
-        //TODO Set Column width...
-        /*if(oColumn.width) {
-            // Validate minWidth
-            var nWidth = (oColumn.minWidth && (oColumn.width < oColumn.minWidth)) ?
-                    oColumn.minWidth : oColumn.width;
-            // ...for fallback cases
-            if(DT._bDynStylesFallback) {
-                elTh.firstChild.style.overflow = 'hidden';
-                elTh.firstChild.style.width = nWidth + 'px';
-            }
-            // ...for non fallback cases
-            else {
-                this._setColumnWidthDynStyles(oColumn, nWidth + 'px', 'hidden');
-            }
-        }*/
-    }
-});
-
-Y.namespace('Plugin').DataTableColResize = DataTableColResize;
-
-
-}, '@VERSION@' ,{requires:['plugin','dd','datatable-base']});
+}, '@VERSION@' ,{lang:['en'], requires:['plugin','datatable-base','recordset-sort']});
 YUI.add('datatable-scroll', function(Y) {
 
 /**
@@ -1811,8 +1820,6 @@ var YDo = Y.Do,
 	CLASS_SCROLLABLE = YgetClassName(DATATABLE, "scrollable"),
 	CONTAINER_HEADER = '<div class="'+CLASS_HEADER+'"></div>',
 	CONTAINER_BODY = '<div class="'+CLASS_BODY+'"></div>',
-	TEMPLATE_TH = '<th id="{id}" rowspan="{rowspan}" colspan="{colspan}"><div class="'+CLASS_LINER+'" style="width:100px">{value}</div></th>',
-	TEMPLATE_TD = '<td headers="{headers}"><div class="'+CLASS_LINER+'" style="width:100px">{value}</div></td>',
 	TEMPLATE_TABLE = '<table></table>';
 	
 
@@ -1886,24 +1893,6 @@ Y.mix(DataTableScroll, {
 });
 
 Y.extend(DataTableScroll, Y.Plugin.Base, {
-	
-	/**
-    * @description The base template for a td DOM element.
-    *
-    * @property tdTemplate
-    * @type string
-    */
-	tdTemplate: TEMPLATE_TD,
-	
-	
-	/**
-    * @description The base template for a th DOM element.
-    *
-    * @property thTemplate
-    * @type string
-    */
-	thTemplate: TEMPLATE_TH,
-	
 	
 	/**
     * @description The table node created in datatable-base
@@ -2011,7 +2000,7 @@ Y.extend(DataTableScroll, Y.Plugin.Base, {
 		this.afterHostMethod("renderUI", this.renderUI);
 		this.afterHostMethod("syncUI", this.syncUI);
 		
-		if (this.get('scroll') === 'y') {
+		if (this.get('scroll') !== 'x') {
 			this.afterHostMethod('_attachTheadThNode', this._attachTheadThNode);
 			this.afterHostMethod('_attachTbodyTdNode', this._attachTbodyTdNode);
 		}
@@ -2168,12 +2157,14 @@ Y.extend(DataTableScroll, Y.Plugin.Base, {
 					//if TH is bigger than TD, enlarge TD Liner
 					if (thWidth > tdWidth) {
 						tdLiner.setStyle('width', (thWidth - 20 + 'px'));
+						//thLiner.setStyle('width', (tdWidth - 20 + 'px'));
 						//stylesheet.set(className,{'width': (thWidth - 20 + 'px')});
 					}
 					
 					//if TD is bigger than TH, enlarge TH Liner
 					else if (tdWidth > thWidth) {
 						thLiner.setStyle('width', (tdWidth - 20 + 'px'));
+						//tdLiner.setStyle('width', (tdWidth - 20 + 'px'));
 						//stylesheet.set(className,{'width': (tdWidth - 20 + 'px')});
 					}
 					
@@ -2187,7 +2178,7 @@ Y.extend(DataTableScroll, Y.Plugin.Base, {
 			//length of the table (does not cover all of the y-scrollbar). By adding this line in when there is a y-scroll, the header will span correctly.
 			
 			//TODO: this should not really occur on this.get('scroll') === y - it should occur when scrollHeight > clientHeight, but clientHeight is not getting recognized in IE6?
-			if (ie && this.get('scroll') === 'y') {
+			if (ie && this.get('scroll') === 'y' && this._bodyContainerNode.get('scrollHeight') > this._bodyContainerNode.get('offsetHeight')) {
 				this._headerContainerNode.setStyle('width', this._parentContainer.get('offsetWidth')+ 15 +'px');
 			}		
 	},
@@ -2218,7 +2209,7 @@ Y.extend(DataTableScroll, Y.Plugin.Base, {
 		
 		if (w !== 'auto') {
 			o.td.get('firstChild').setStyles({'width': w, 'overflow': 'hidden'}); //TODO: use liner API but liner is undefined here (not created?)
-			//o.td.setStyles({'width': width, 'overflow': 'hidden'});
+			//o.td.setStyles({'width': w, 'overflow': 'hidden'});
 		}
 		return o;
 	},
@@ -2305,9 +2296,9 @@ Y.extend(DataTableScroll, Y.Plugin.Base, {
 			w = this.get('width') || "",
 			el = this._headerContainerNode;
 		
-		if (dir !== 'y') {
+		//if (dir !== 'y') {
 			el.setStyles({'width': w, 'overflow': 'hidden'});
-		}
+		// }
 	},
 	
 	/**
@@ -2466,5 +2457,5 @@ Y.namespace("Plugin").DataTableScroll = DataTableScroll;
 }, '@VERSION@' ,{requires:['plugin','datatable-base','stylesheet']});
 
 
-YUI.add('datatable', function(Y){}, '@VERSION@' ,{use:['datatable-base','datatable-sort','datatable-colresize','datatable-scroll']});
+YUI.add('datatable', function(Y){}, '@VERSION@' ,{use:['datatable-base','datatable-sort','datatable-scroll']});
 

@@ -403,7 +403,10 @@
             "datatable-base": {
                 "requires": [
                     "recordset-base", 
-                    "widget"
+                    "widget", 
+                    "intl", 
+                    "substitute", 
+                    "event-mouseenter"
                 ], 
                 "skinnable": true
             }, 
@@ -611,6 +614,16 @@
             }
         }
     }, 
+    "dial": {
+        "requires": [
+            "widget", 
+            "dd-drag", 
+            "substitute", 
+            "event-mouseenter", 
+            "transition"
+        ], 
+        "skinnable": true
+    }, 
     "dom": {
         "plugins": {
             "dom-deprecated": {
@@ -688,13 +701,17 @@
                     "frame", 
                     "node", 
                     "exec-command", 
-                    "selection", 
-                    "editor-para"
+                    "selection"
                 ]
             }, 
             "editor-bidi": {
                 "requires": [
                     "editor-base"
+                ]
+            }, 
+            "editor-br": {
+                "requires": [
+                    "node"
                 ]
             }, 
             "editor-lists": {

@@ -1239,8 +1239,14 @@ YUI.add('selection', function(Y) {
     * @return {Node} The Resolved node
     */
     Y.Selection.resolve = function(n) {
+        console.log(n);
         if (n && n.nodeType === 3) {
-            n = n.parentNode;
+            //Adding a try/catch here because in rare occasions IE will
+            //Throw a error accessing the parentNode of a stranded text node.
+            //In the case of Ctrl+Z (Undo)
+            try {
+                n = n.parentNode;
+            } catch (re) {}
         }
         return Y.one(n);
     };
@@ -1934,7 +1940,7 @@ YUI.add('exec-command', function(Y) {
                     cur = sel.getCursor();
                     cur.insert('<br>', 'before');
                     sel.focusCursor(true, false);
-                    return cur.previous();
+                    return ((cur && cur.previous) ? cur.previous() : null);
                 },
                 /**
                 * Inserts an image at the cursor position
@@ -2310,7 +2316,7 @@ YUI.add('editor-base', function(Y) {
                 defaultFn: this._defNodeChangeFn
             });
             
-            this.plug(Y.Plugin.EditorPara);
+            //this.plug(Y.Plugin.EditorPara);
         },
         destructor: function() {
             this.frame.destroy();
@@ -2360,7 +2366,7 @@ YUI.add('editor-base', function(Y) {
         */
         _resolveChangedNode: function(n) {
             var inst = this.getInstance(), lc, lc2, found;
-            if (inst && n.test('html')) {
+            if (inst && n && n.test('html')) {
                 lc = inst.one(BODY).one(LAST_CHILD);
                 while (!found) {
                     if (lc) {
@@ -2441,55 +2447,16 @@ YUI.add('editor-base', function(Y) {
                         }
                     }
                     break;
-                case 'enter-up':
-                    var para = ((this._lastPara) ? this._lastPara : e.changedNode),
-                        b = para.one('br.yui-cursor');
-
-                    if (this._lastPara) {
-                        delete this._lastPara;
-                    }
-
-                    if (b) {
-                        if (b.previous() || b.next()) {
-                            b.remove();
-                        }
-                    }
-                    if (!para.test(btag)) {
-                        var para2 = para.ancestor(btag);
-                        if (para2) {
-                            para = para2;
-                            para2 = null;
-                        }
-                    }
-                    if (para.test(btag)) {
-                        var prev = para.previous(), lc, lc2, found = false;
-                        if (prev) {
-                            lc = prev.one(LAST_CHILD);
-                            while (!found) {
-                                if (lc) {
-                                    lc2 = lc.one(LAST_CHILD);
-                                    if (lc2) {
-                                        lc = lc2;
-                                    } else {
-                                        found = true;
-                                    }
-                                } else {
-                                    found = true;
-                                }
-                            }
-                            if (lc) {
-                                this.copyStyles(lc, para);
-                            }
-                        }
-                    }
-                    break;
             }
-            if (Y.UA.gecko) {
-                if (e.changedNode && !e.changedNode.test(btag)) {
-                    var p = e.changedNode.ancestor(btag);
-                    if (p) {
-                        this._lastPara = p;
-                    }
+            if (Y.UA.webkit && e.commands && (e.commands.indent || e.commands.outdent)) {
+                /**
+                * When executing execCommand 'indent or 'outdent' Webkit applies
+                * a class to the BLOCKQUOTE that adds left/right margin to it
+                * This strips that style so it is just a normal BLOCKQUOTE
+                */
+                var bq = inst.all('.webkit-indent-blockquote');
+                if (bq.size()) {
+                    bq.setStyle('margin', '');
                 }
             }
 
@@ -3133,7 +3100,7 @@ YUI.add('editor-base', function(Y) {
 
 
 
-}, '@VERSION@' ,{requires:['base', 'frame', 'node', 'exec-command'], skinnable:false});
+}, '@VERSION@' ,{requires:['base', 'frame', 'node', 'exec-command', 'selection', 'editor-para'], skinnable:false});
 YUI.add('editor-lists', function(Y) {
 
     /**
@@ -3582,7 +3549,7 @@ YUI.add('editor-bidi', function(Y) {
 
 
 
-}, '@VERSION@' ,{requires:['editor-base', 'selection'], skinnable:false});
+}, '@VERSION@' ,{requires:['editor-base'], skinnable:false});
 YUI.add('editor-para', function(Y) {
 
 
@@ -3602,8 +3569,8 @@ YUI.add('editor-para', function(Y) {
 
     var EditorPara = function() {
         EditorPara.superclass.constructor.apply(this, arguments);
-    }, HOST = 'host', BODY = 'body', NODE_CHANGE = 'nodeChange',
-    FIRST_P = BODY + ' > p', P = 'p';
+    }, HOST = 'host', BODY = 'body', NODE_CHANGE = 'nodeChange', PARENT_NODE = 'parentNode',
+    FIRST_P = BODY + ' > p', P = 'p', BR = '<br>', FC = 'firstChild', LI = 'li';
 
 
     Y.extend(EditorPara, Y.Base, {
@@ -3624,9 +3591,54 @@ YUI.add('editor-para', function(Y) {
         * @method _onNodeChange
         */
         _onNodeChange: function(e) {
-            var host = this.get(HOST), inst = host.getInstance();
+            var host = this.get(HOST), inst = host.getInstance(),
+                html, txt, par , d, sel, btag = inst.Selection.DEFAULT_BLOCK_TAG,
+                inHTML, txt2, childs, aNode, index, node2, top, n, sib,
+                ps, br, item, p, imgs, t, LAST_CHILD = ':last-child';
 
             switch (e.changedType) {
+                case 'enter-up':
+                    var para = ((this._lastPara) ? this._lastPara : e.changedNode),
+                        b = para.one('br.yui-cursor');
+
+                    if (this._lastPara) {
+                        delete this._lastPara;
+                    }
+
+                    if (b) {
+                        if (b.previous() || b.next()) {
+                            b.remove();
+                        }
+                    }
+                    if (!para.test(btag)) {
+                        var para2 = para.ancestor(btag);
+                        if (para2) {
+                            para = para2;
+                            para2 = null;
+                        }
+                    }
+                    if (para.test(btag)) {
+                        var prev = para.previous(), lc, lc2, found = false;
+                        if (prev) {
+                            lc = prev.one(LAST_CHILD);
+                            while (!found) {
+                                if (lc) {
+                                    lc2 = lc.one(LAST_CHILD);
+                                    if (lc2) {
+                                        lc = lc2;
+                                    } else {
+                                        found = true;
+                                    }
+                                } else {
+                                    found = true;
+                                }
+                            }
+                            if (lc) {
+                                host.copyStyles(lc, para);
+                            }
+                        }
+                    }
+                    break;
                 case 'enter':
                     if (Y.UA.webkit) {
                         //Webkit doesn't support shift+enter as a BR, this fixes that.
@@ -3635,22 +3647,78 @@ YUI.add('editor-para', function(Y) {
                             e.changedEvent.preventDefault();
                         }
                     }
+                    //TODO Move this to a GECKO MODULE - Can't for the moment, requires no change to metadata (YMAIL)
                     if (Y.UA.gecko && host.get('defaultblock') !== 'p') {
-                        var par = e.changedNode, d, sel, btag = inst.Selection.DEFAULT_BLOCK_TAG;
-                        if (!par.test(btag)) {
-                            par = par.ancestor(btag);
+                        par = e.changedNode;
+
+                        if (!par.test(LI) && !par.ancestor(LI)) {
+                            if (!par.test(btag)) {
+                                par = par.ancestor(btag);
+                            }
+                            d = inst.Node.create('<' + btag + '></' + btag + '>');
+                            par.insert(d, 'after');
+                            sel = new inst.Selection();
+                            if (sel.anchorOffset) {
+                                inHTML = sel.anchorNode.get('textContent');
+
+                                txt = inst.one(inst.config.doc.createTextNode(inHTML.substr(0, sel.anchorOffset)));
+                                txt2 = inst.one(inst.config.doc.createTextNode(inHTML.substr(sel.anchorOffset)));
+
+                                aNode = sel.anchorNode;
+                                aNode.setContent(''); //I
+                                node2 = aNode.cloneNode(); //I
+                                node2.append(txt2); //text
+                                top = false;
+                                sib = aNode; //I
+                                while (!top) {
+                                    sib = sib.get(PARENT_NODE); //B
+                                    if (sib && !sib.test(btag)) {
+                                        n = sib.cloneNode();
+                                        n.set('innerHTML', '');
+                                        n.append(node2);
+                                        
+                                        //Get children..
+                                        childs = sib.get('childNodes');
+                                        var start = false;
+                                        childs.each(function(c) {
+                                            if (start) {
+                                                n.append(c);
+                                            }
+                                            if (c === aNode) {
+                                                start = true;
+                                            }
+                                        });
+
+                                        aNode = sib; //Top sibling
+                                        node2 = n;
+                                    } else {
+                                        top = true;
+                                    }
+                                }
+                                txt2 = node2;
+                                sel.anchorNode.append(txt);
+
+                                if (txt2) {
+                                    d.append(txt2);
+                                }
+                            }
+                            if (d.get(FC)) {
+                                d = d.get(FC);
+                            }
+                            d.prepend(inst.Selection.CURSOR);
+                            sel.focusCursor(true, true);
+                            html = inst.Selection.getText(d);
+                            if (html !== '') {
+                                inst.Selection.cleanCursor();
+                            }
+                            e.changedEvent.preventDefault();
                         }
-                        d = inst.Node.create('<' + btag + '>' + inst.Selection.CURSOR + '</' + btag + '>');
-                        sel = new inst.Selection();
-                        par.insert(d, 'after');
-                        sel.focusCursor(true, false);
-                        e.changedEvent.preventDefault();
                     }
                     break;
                 case 'keydown':
                     if (inst.config.doc.childNodes.length < 2) {
                         var cont = inst.config.doc.body.innerHTML;
-                        if (cont && cont.length < 5 && cont.toLowerCase() == '<br>') {
+                        if (cont && cont.length < 5 && cont.toLowerCase() == BR) {
                             this._fixFirstPara();
                         }
                     }
@@ -3659,7 +3727,7 @@ YUI.add('editor-para', function(Y) {
                 case 'backspace-down':
                 case 'delete-up':
                     if (!Y.UA.ie) {
-                        var ps = inst.all(FIRST_P), br, item, html, txt, p, imgs;
+                        ps = inst.all(FIRST_P);
                         item = inst.one(BODY);
                         if (ps.item(0)) {
                             item = ps.item(0);
@@ -3690,7 +3758,7 @@ YUI.add('editor-para', function(Y) {
                                 p = p.ancestor(P);
                             }
                             if (p) {
-                                if (!p.previous() && p.get('parentNode') && p.get('parentNode').test(BODY)) {
+                                if (!p.previous() && p.get(PARENT_NODE) && p.get(PARENT_NODE).test(BODY)) {
                                     Y.log('Stopping the backspace event', 'warn', 'editor-para');
                                     e.changedEvent.frameEvent.halt();
                                 }
@@ -3700,10 +3768,10 @@ YUI.add('editor-para', function(Y) {
                             if (e.changedNode) {
                                 item = e.changedNode;
                                 if (item.test('li') && (!item.previous() && !item.next())) {
-                                    html = item.get('innerHTML').replace('<br>', '');
+                                    html = item.get('innerHTML').replace(BR, '');
                                     if (html === '') {
-                                        if (item.get('parentNode')) {
-                                            item.get('parentNode').replace(inst.Node.create('<br>'));
+                                        if (item.get(PARENT_NODE)) {
+                                            item.get(PARENT_NODE).replace(inst.Node.create(BR));
                                             e.changedEvent.frameEvent.halt();
                                             e.preventDefault();
                                             inst.Selection.filterBlocks();
@@ -3720,12 +3788,20 @@ YUI.add('editor-para', function(Y) {
                         * Dropping in the empty textnode and then removing it causes FF to redraw and
                         * remove the "ghost cursors"
                         */
-                        var d = e.changedNode,
-                            t = inst.config.doc.createTextNode(' ');
+                        d = e.changedNode;
+                        t = inst.config.doc.createTextNode(' ');
                         d.appendChild(t);
                         d.removeChild(t);
                     }
                     break;
+            }
+            if (Y.UA.gecko) {
+                if (e.changedNode && !e.changedNode.test(btag)) {
+                    var p = e.changedNode.ancestor(btag);
+                    if (p) {
+                        this._lastPara = p;
+                    }
+                }
             }
             
         },
@@ -3770,6 +3846,10 @@ YUI.add('editor-para', function(Y) {
         },
         initializer: function() {
             var host = this.get(HOST);
+            if (host.editorBR) {
+                Y.error('Can not plug EditorPara and EditorBR at the same time.');
+                return;
+            }
 
             host.on(NODE_CHANGE, Y.bind(this._onNodeChange, this));
             host.after('ready', Y.bind(this._afterEditorReady, this));
@@ -3804,8 +3884,109 @@ YUI.add('editor-para', function(Y) {
 
 
 
-}, '@VERSION@' ,{requires:['editor-base', 'selection'], skinnable:false});
+}, '@VERSION@' ,{requires:['node'], skinnable:false});
+YUI.add('editor-br', function(Y) {
 
 
-YUI.add('editor', function(Y){}, '@VERSION@' ,{skinnable:false, use:['frame', 'selection', 'exec-command', 'editor-base']});
+
+    /**
+     * Plugin for Editor to normalize BR's.
+     * @module editor
+     * @submodule editor-br
+     */     
+    /**
+     * Plugin for Editor to normalize BR's.
+     * @class Plugin.EditorBR
+     * @extends Base
+     * @constructor
+     */
+
+
+    var EditorBR = function() {
+        EditorBR.superclass.constructor.apply(this, arguments);
+    }, HOST = 'host', LI = 'li';
+
+
+    Y.extend(EditorBR, Y.Base, {
+        /**
+        * Frame keyDown handler that normalizes BR's when pressing ENTER.
+        * @private
+        * @method _onKeyDown
+        */
+        _onKeyDown: function(e) {
+            if (e.keyCode == 13) {
+                var host = this.get(HOST), inst = host.getInstance(),
+                    sel = new inst.Selection();
+
+                if (sel) {
+                    if (Y.UA.ie) {
+                        if (!sel.anchorNode.test(LI) && !sel.anchorNode.ancestor(LI)) {
+                            sel._selection.pasteHTML('<br>');
+                            sel._selection.collapse(false);
+                            sel._selection.select();
+                            e.halt();
+                        }
+                    }
+                    if (Y.UA.webkit) {
+                        if (!sel.anchorNode.test(LI) && !sel.anchorNode.ancestor(LI)) {
+                            host.frame._execCommand('insertlinebreak', null);
+                            e.halt();
+                        }
+                    }
+                }
+            }
+        },
+        /**
+        * Adds listeners for keydown in IE and Webkit. Also fires insertbeonreturn for supporting browsers.
+        * @private
+        * @method _afterEditorReady
+        */
+        _afterEditorReady: function() {
+            var inst = this.get(HOST).getInstance();
+            try {
+                inst.config.doc.execCommand('insertbronreturn', null, true);
+            } catch (bre) {};
+
+            if (Y.UA.ie || Y.UA.webkit) {
+                inst.on('keydown', Y.bind(this._onKeyDown, this), inst.config.doc);
+            }
+        },
+        initializer: function() {
+            var host = this.get(HOST);
+            if (host.editorPara) {
+                Y.error('Can not plug EditorBR and EditorPara at the same time.');
+                return;
+            }
+            host.after('ready', Y.bind(this._afterEditorReady, this));
+        }
+    }, {
+        /**
+        * editorBR
+        * @static
+        * @property NAME
+        */
+        NAME: 'editorBR',
+        /**
+        * editorBR
+        * @static
+        * @property NS
+        */
+        NS: 'editorBR',
+        ATTRS: {
+            host: {
+                value: false
+            }
+        }
+    });
+    
+    Y.namespace('Plugin');
+    
+    Y.Plugin.EditorBR = EditorBR;
+
+
+
+}, '@VERSION@' ,{requires:['node'], skinnable:false});
+
+
+YUI.add('editor', function(Y){}, '@VERSION@' ,{skinnable:false, use:['frame', 'selection', 'exec-command', 'editor-base', 'editor-para', 'editor-br']});
 

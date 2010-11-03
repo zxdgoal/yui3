@@ -1098,8 +1098,6 @@ YUI.add('dd-drag', function(Y) {
                 var n = Y.one(node);
                 if (!n) {
                     Y.error('DD.Drag: Invalid Node Given: ' + node);
-                } else {
-                    n = n.item(0);
                 }
                 return n;
             }
@@ -2899,6 +2897,7 @@ YUI.add('dd-constrain', function(Y) {
 	});
 
 
+
 }, '@VERSION@' ,{requires:['dd-drag'], skinnable:false});
 YUI.add('dd-scroll', function(Y) {
 
@@ -3297,7 +3296,6 @@ YUI.add('dd-scroll', function(Y) {
                         Y.error('DDNodeScroll: Invalid Node Given: ' + node);
                     }
                 } else {
-                    n = n.item(0);
                     this.set(PARENT_SCROLL, n);
                 }
                 return n;
