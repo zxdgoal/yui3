@@ -1,7 +1,7 @@
 YUI.add('loader-base', function(Y) {
 
 /**
- * The YUI loader core 2
+ * The YUI loader core
  * @module loader
  * @submodule loader-base
  */
