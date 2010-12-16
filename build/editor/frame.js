@@ -64,7 +64,7 @@ YUI.add('frame', function(Y) {
 
             this._iframe.set('height', '99%');
 
-
+            
             var html = '',
                 extra_css = ((this.get('extracss')) ? '<style id="extra_css">' + this.get('extracss') + '</style>' : '');
 
@@ -80,7 +80,9 @@ YUI.add('frame', function(Y) {
                 EXTRA_CSS: extra_css
             });
             if (Y.config.doc.compatMode != 'BackCompat') {
-                html = Frame.DOC_TYPE + "\n" + html;
+                
+                //html = Frame.DOC_TYPE + "\n" + html;
+                html = Frame.getDocType() + "\n" + html;
             } else {
             }
 
@@ -224,6 +226,7 @@ YUI.add('frame', function(Y) {
                 kfn = ((Y.UA.ie) ? Y.throttle(fn, 200) : fn);
 
             inst.Node.DOM_EVENTS.activate = 1;
+            inst.Node.DOM_EVENTS.beforedeactivate = 1;
             inst.Node.DOM_EVENTS.focusin = 1;
             inst.Node.DOM_EVENTS.deactivate = 1;
             inst.Node.DOM_EVENTS.focusout = 1;
@@ -233,7 +236,11 @@ YUI.add('frame', function(Y) {
                 if (v === 1) {
                     if (k !== 'focus' && k !== 'blur' && k !== 'paste') {
                         if (k.substring(0, 3) === 'key') {
-                            inst.on(k, kfn, inst.config.doc);
+                            if (k === 'keydown') {
+                                inst.on(k, fn, inst.config.doc);
+                            } else {
+                                inst.on(k, kfn, inst.config.doc);
+                            }
                         } else {
                             inst.on(k, fn, inst.config.doc);
                         }
@@ -251,11 +258,53 @@ YUI.add('frame', function(Y) {
 
             inst._use = inst.use;
             inst.use = Y.bind(this.use, this);
-
             this._iframe.setStyles({
                 visibility: 'inherit'
             });
             inst.one('body').setStyle('display', 'block');
+            if (Y.UA.ie) {
+                this._fixIECursors();
+            }
+        },
+        /**
+        * It appears that having a BR tag anywhere in the source "below" a table with a percentage width (in IE 7 & 8)
+        * if there is any TEXTINPUT's outside the iframe, the cursor will rapidly flickr and the CPU would occasionally 
+        * spike. This method finds all <BR>'s below the sourceIndex of the first table. Does some checks to see if they
+        * can be modified and replaces then with a <WBR> so the layout will remain in tact, but the flickering will
+        * no longer happen.
+        * @method _fixIECursors
+        * @private
+        */
+        _fixIECursors: function() {
+            var inst = this.getInstance(),
+                tables = inst.all('table'),
+                brs = inst.all('br'), si;
+
+            if (tables.size() && brs.size()) {
+                //First Table
+                si = tables.item(0).get('sourceIndex');
+                brs.each(function(n) {
+                    var p = n.get('parentNode'),
+                        c = p.get('children'), b = p.all('>br');
+                    
+                    if (p.test('div')) {
+                        if (c.size() > 2) {
+                            n.replace(inst.Node.create('<wbr>'));
+                        } else {
+                            if (n.get('sourceIndex') > si) {
+                                if (b.size()) {
+                                    n.replace(inst.Node.create('<wbr>'));
+                                }
+                            } else {
+                                if (b.size() > 1) {
+                                    n.replace(inst.Node.create('<wbr>'));
+                                }
+                            }
+                        }
+                    }
+                    
+                });
+            }
         },
         /**
         * @private
@@ -476,6 +525,7 @@ YUI.add('frame', function(Y) {
             }
 
             this._create(Y.bind(function(res) {
+
                 var inst, timer,
                     cb = Y.bind(function(i) {
                         this._instanceLoaded(i);
@@ -525,6 +575,10 @@ YUI.add('frame', function(Y) {
 
                 if (c.size() == 1) {
                     if (c.item(0).test('br')) {
+                        sel.selectNode(n, true, false);
+                    }
+                    if (c.item(0).test('p')) {
+                        n = c.item(0).one('br.yui-cursor').get('parentNode');
                         sel.selectNode(n, true, false);
                     }
                 }
@@ -618,6 +672,7 @@ YUI.add('frame', function(Y) {
             keypress: 1,
             activate: 1,
             deactivate: 1,
+            beforedeactivate: 1,
             focusin: 1,
             focusout: 1
         },
@@ -645,6 +700,36 @@ YUI.add('frame', function(Y) {
         * @type String
         */
         PAGE_HTML: '<html dir="{DIR}" lang="{LANG}"><head><title>{TITLE}</title>{META}<base href="{BASE_HREF}"/>{LINKED_CSS}<style id="editor_css">{DEFAULT_CSS}</style>{EXTRA_CSS}</head><body>{CONTENT}</body></html>',
+
+        /**
+        * @static
+        * @method getDocType
+        * @description Parses document.doctype and generates a DocType to match the parent page, if supported.
+        * For IE8, it grabs document.all[0].nodeValue and uses that. For IE < 8, it falls back to Frame.DOC_TYPE.
+        * @returns {String} The normalized DocType to apply to the iframe
+        */
+        getDocType: function() {
+            var dt = Y.config.doc.doctype,
+                str = Frame.DOC_TYPE;
+
+            if (dt) {
+                str = '<!DOCTYPE ' + dt.name + ((dt.publicId) ? ' ' + dt.publicId : '') + ((dt.systemId) ? ' ' + dt.systemId : '') + '>';
+            } else {
+                if (Y.config.doc.all) {
+                    dt = Y.config.doc.all[0];
+                    if (dt.nodeType) {
+                        if (dt.nodeType === 8) {
+                            if (dt.nodeValue) {
+                                if (dt.nodeValue.toLowerCase().indexOf('doctype') !== -1) {
+                                    str = '<!' + dt.nodeValue + '>';
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return str;
+        },
         /**
         * @static
         * @property DOC_TYPE
@@ -749,6 +834,18 @@ YUI.add('frame', function(Y) {
                 value: 'body',
                 setter: function(n) {
                     return Y.one(n);
+                }
+            },
+            /**
+            * @attribute node
+            * @description The Node instance of the iframe.
+            * @type Node
+            */
+            node: {
+                readOnly: true,
+                value: null,
+                getter: function() {
+                    return this._iframe;
                 }
             },
             /**

@@ -1,6 +1,7 @@
 YUI.add('datatable-base', function(Y) {
 
 var YLang = Y.Lang,
+    YisValue = YLang.isValue,
     Ysubstitute = Y.Lang.substitute,
     YNode = Y.Node,
     Ycreate = YNode.create,
@@ -16,7 +17,7 @@ var YLang = Y.Lang,
     MOUSEUP = "mouseup",
     MOUSEDOWN = "mousedown",
     CLICK = "click",
-    DOUBLECLICK = "doubleclick",
+    DBLCLICK = "dblclick",
 
     CLASS_COLUMNS = YgetClassName(DATATABLE, "columns"),
     CLASS_DATA = YgetClassName(DATATABLE, "data"),
@@ -31,7 +32,7 @@ var YLang = Y.Lang,
     TEMPLATE_COL = '<col></col>',
     TEMPLATE_THEAD = '<thead class="'+CLASS_COLUMNS+'"></thead>',
     TEMPLATE_TBODY = '<tbody class="'+CLASS_DATA+'"></tbody>',
-    TEMPLATE_TH = '<th id="{id}" rowspan="{rowspan}" colspan="{colspan}" class="{classnames}"><div class="'+CLASS_LINER+'">{value}</div></th>',
+    TEMPLATE_TH = '<th id="{id}" rowspan="{rowspan}" colspan="{colspan}" class="{classnames}" abbr="{abbr}"><div class="'+CLASS_LINER+'">{value}</div></th>',
     TEMPLATE_TR = '<tr id="{id}"></tr>',
     TEMPLATE_TD = '<td headers="{headers}" class="{classnames}"><div class="'+CLASS_LINER+'">{value}</div></td>',
     TEMPLATE_VALUE = '{value}',
@@ -73,60 +74,91 @@ Y.mix(Column, {
 //
 /////////////////////////////////////////////////////////////////////////////
     ATTRS: {
+        /**
+        * @attribute id
+        * @description Unique internal identifier, used to stamp ID on TH element.
+        * @type String
+        * @readOnly
+        */
         id: {
             valueFn: "_defaultId",
-            writeOnce: true
+            readOnly: true
         },
+        
+        /**
+        * @attribute key
+        * @description User-supplied identifier. Defaults to id.
+        * @type String
+        */
         key: {
             valueFn: "_defaultKey"
         },
+
+        /**
+        * @attribute field
+        * @description Points to underlying data field (for sorting or formatting,
+        * for example). Useful when column doesn't hold any data itself, but is
+        * just a visual representation of data from another column or record field.
+        * Defaults to key.
+        * @type String
+        */
         field: {
             valueFn: "_defaultField"
         },
+
+        /**
+        * @attribute label
+        * @description Display label for column header. Defaults to key.
+        * @type String
+        */
         label: {
             valueFn: "_defaultLabel"
         },
-        keyIndex: {
-            readOnly: true
-        },
-        parent: {
-            readOnly: true
-        },
+        
+        /**
+        * @attribute children
+        * @description Array of child column definitions (for nested headers).
+        * @type String
+        */
         children: {
-        },
-        colSpan: {
-            readOnly: true
-        },
-        rowSpan: {
-            readOnly: true
-        },
-        thNode: {
-            readOnly: true
-        },
-        thLinerNode: {
-            readOnly: true
-        },
-        thLabelNode: {
-            readOnly: true
-        },
-        abbr: {
             value: null
         },
-        headers: {}, // set by Columnset code
+        
+        /**
+        * @attribute abbr
+        * @description TH abbr attribute.
+        * @type String
+        */
+        abbr: {
+            value: ""
+        },
+
+        //TODO: support custom classnames
+        // TH CSS classnames
         classnames: {
             readOnly: true,
             getter: "_getClassnames"
         },
-        editor: {},
+        
+        // Column formatter
         formatter: {},
 
-        // requires datatable-colresize
-        resizeable: {},
-
         //requires datatable-sort
-        sortable: {},
-        hidden: {},
+        sortable: {
+            value: false
+        },
+        //sortOptions:defaultDir, sortFn, field
+
+        //TODO: support editable columns
+        // Column editor
+        editor: {},
+
+        //TODO: support resizeable columns
+        //TODO: support setting widths
+        // requires datatable-colresize
         width: {},
+        resizeable: {},
+        minimized: {},
         minWidth: {},
         maxAutoWidth: {}
     }
@@ -197,6 +229,73 @@ Y.extend(Column, Y.Widget, {
         this._uiSetAbbr(e.newVal);
     },
 
+    /////////////////////////////////////////////////////////////////////////////
+    //
+    // PROPERTIES
+    //
+    /////////////////////////////////////////////////////////////////////////////
+    /**
+     * Reference to Column's current position index within its Columnset's keys
+     * array, if applicable. This property only applies to non-nested and bottom-
+     * level child Columns. Value is set by Columnset code.
+     *
+     * @property keyIndex
+     * @type Number
+     */
+    keyIndex: null,
+    
+    /**
+    * @property headers
+    * @description Array of TH IDs associated with this column, for TD "headers"
+    * attribute. Value is set by Columnset code
+    * @type String[]
+    */
+    headers: null,
+
+    /**
+     * Number of cells the header spans. Value is set by Columnset code.
+     *
+     * @property colSpan
+     * @type Number
+     * @default 1
+     */
+    colSpan: 1,
+    
+    /**
+     * Number of rows the header spans. Value is set by Columnset code.
+     *
+     * @property rowSpan
+     * @type Number
+     * @default 1
+     */
+    rowSpan: 1,
+
+    /**
+     * Column's parent Column instance, if applicable. Value is set by Columnset
+     * code.
+     *
+     * @property parent
+     * @type Y.Column
+     */
+    parent: null,
+
+    /**
+     * The Node reference to the associated TH element.
+     *
+     * @property thNode
+     * @type Y.Node
+     */
+     
+    thNode: null,
+
+    /*TODO
+     * The Node reference to the associated liner element.
+     *
+     * @property thLinerNode
+     * @type Y.Node
+     
+    thLinerNode: null,*/
+    
     /////////////////////////////////////////////////////////////////////////////
     //
     // METHODS
@@ -308,7 +407,7 @@ Y.extend(Column, Y.Widget, {
      * @protected
      */
     _uiSetAbbr: function(val) {
-        this._thNode.set("abbr", val);
+        this.thNode.set("abbr", val);
     }
 });
 
@@ -347,34 +446,15 @@ Y.mix(Columnset, {
     //
     /////////////////////////////////////////////////////////////////////////////
     ATTRS: {
+        /**
+        * @attribute definitions
+        * @description Array of column definitions that will populate this Columnset.
+        * @type Array
+        */
         definitions: {
             setter: "_setDefinitions"
-        },
-
-        // DOM tree representation of all Columns
-        tree: {
-            readOnly: true,
-            value: []
-        },
-
-        //TODO: is this necessary?
-        // Flat representation of all Columns
-        flat: {
-            readOnly: true,
-            value: []
-        },
-
-        // Hash of all Columns by ID
-        hash: {
-            readOnly: true,
-            value: {}
-        },
-
-        // Flat representation of only Columns that are meant to display data
-        keys: {
-            readOnly: true,
-            value: []
         }
+
     }
 });
 
@@ -399,6 +479,44 @@ Y.extend(Columnset, Y.Base, {
     _setDefinitions: function(definitions) {
             return Y.clone(definitions);
     },
+    
+    /////////////////////////////////////////////////////////////////////////////
+    //
+    // PROPERTIES
+    //
+    /////////////////////////////////////////////////////////////////////////////
+    /**
+     * Top-down tree representation of Column hierarchy. Used to create DOM
+     * elements.
+     *
+     * @property tree
+     * @type Y.Column[]
+     */
+    tree: null,
+
+    /**
+     * Hash of all Columns by ID.
+     *
+     * @property idHash
+     * @type Object
+     */
+    idHash: null,
+
+    /**
+     * Hash of all Columns by key.
+     *
+     * @property keyHash
+     * @type Object
+     */
+    keyHash: null,
+
+    /**
+     * Array of only Columns that are meant to be displayed in DOM.
+     *
+     * @property keys
+     * @type Y.Column[]
+     */
+    keys: null,
 
     /////////////////////////////////////////////////////////////////////////////
     //
@@ -417,10 +535,10 @@ Y.extend(Columnset, Y.Base, {
 
         // DOM tree representation of all Columns
         var tree = [],
-        // Flat representation of all Columns
-        flat = [],
         // Hash of all Columns by ID
-        hash = {},
+        idHash = {},
+        // Hash of all Columns by key
+        keyHash = {},
         // Flat representation of only Columns that are meant to display data
         keys = [],
         // Original definitions
@@ -456,15 +574,13 @@ Y.extend(Columnset, Y.Base, {
                 // Cross-reference Column ID back to the original object literal definition
                 currentDefinition.yuiColumnId = column.get("id");
 
-                // Add the new Column to the flat list
-                flat.push(column);
-
                 // Add the new Column to the hash
-                hash[column.get("id")] = column;
+                idHash[column.get("id")] = column;
+                keyHash[column.get("key")] = column;
 
                 // Assign its parent as an attribute, if applicable
                 if(parent) {
-                    column._set("parent", parent);
+                    column.parent = parent;
                 }
 
                 // The Column has descendants
@@ -484,8 +600,9 @@ Y.extend(Columnset, Y.Base, {
                 }
                 // This Column does not have any children
                 else {
-                    column._set("keyIndex", keys.length);
-                    column._set("colSpan", 1);
+                    column.keyIndex = keys.length;
+                    // Default is already 1
+                    //column.colSpan = 1;
                     keys.push(column);
                 }
 
@@ -500,10 +617,10 @@ Y.extend(Columnset, Y.Base, {
 
 
         // Save to the Columnset instance
-        this._set("tree", tree);
-        this._set("flat", flat);
-        this._set("hash", hash);
-        this._set("keys", keys);
+        this.tree = tree;
+        this.idHash = idHash;
+        this.keyHash = keyHash;
+        this.keys = keys;
 
         this._setRowSpans();
         this._setHeaders();
@@ -597,7 +714,7 @@ Y.extend(Columnset, Y.Base, {
             }
         }
         countTerminalChildNodes(definition);
-        column._set("colSpan", terminalChildNodes);
+        column.colSpan = terminalChildNodes;
     },
 
     /**
@@ -653,18 +770,17 @@ Y.extend(Columnset, Y.Base, {
                 for(p=0; p<currentRow.length; p++) {
                     currentColumn = currentRow[p];
                     if(!YLang.isArray(currentColumn.get("children"))) {
-                        currentColumn._set("rowSpan", maxRowDepth);
+                        currentColumn.rowSpan = maxRowDepth;
                     }
-                    else {
-                        currentColumn._set("rowSpan", 1);
-                    }
+                    // Default is already 1
+                    // else currentColumn.rowSpan =1;
                 }
 
                 // Reset counter for next row
                 maxRowDepth = 1;
             }
         }
-        parseDomTreeForRowSpan(this.get("tree"));
+        parseDomTreeForRowSpan(this.tree);
     },
 
     /**
@@ -674,24 +790,24 @@ Y.extend(Columnset, Y.Base, {
     */
     _setHeaders: function() {
         var headers, column,
-            allKeys = this.get("keys"),
+            allKeys = this.keys,
             i=0, len = allKeys.length;
 
         function recurseAncestorsForHeaders(headers, column) {
-            headers.push(column.get("key"));
-            //headers[i].push(column.getSanitizedKey());
-            if(column.get("parent")) {
-                recurseAncestorsForHeaders(headers, column.get("parent"));
+            headers.push(column.get("id"));
+            if(column.parent) {
+                recurseAncestorsForHeaders(headers, column.parent);
             }
         }
         for(; i<len; ++i) {
             headers = [];
             column = allKeys[i];
             recurseAncestorsForHeaders(headers, column);
-            column._set("headers", headers.reverse().join(" "));
+            column.headers = headers.reverse().join(" ");
         }
     },
 
+    //TODO
     getColumn: function() {
     }
 });
@@ -714,7 +830,7 @@ Y.Columnset = Columnset;
 
 /**
  * Base class for the DataTable widget.
- * @class DataSource.Base
+ * @class DataTable.Base
  * @extends Widget
  * @constructor
  */
@@ -761,6 +877,7 @@ Y.mix(DTBase, {
         * @type Array | Y.Recordset
         */
         recordset: {
+            value: new Y.Recordset({records:[]}),
             setter: "_setRecordset"
         },
 
@@ -777,15 +894,19 @@ Y.mix(DTBase, {
         },*/
 
         /**
-        * @attribute strings
-        * @description The collection of localizable strings used to label
-        * elements of the UI.
-        * @type Object
+        * @attribute summary
+        * @description Summary.
+        * @type String
         */
-        strings: {
-            valueFn: function() {
-                return Y.Intl.get("datatable-base");
-            }
+        summary: {
+        },
+
+        /**
+        * @attribute caption
+        * @description Caption
+        * @type String
+        */
+        caption: {
         },
 
         /**
@@ -841,7 +962,7 @@ Y.extend(DTBase, Y.Widget, {
     * @property thTemplate
     * @description Tokenized markup template for TH node creation.
     * @type String
-    * @default '<th id="{id}" rowspan="{rowspan}" colspan="{colspan}"><div class="'+CLASS_LINER+'">{value}</div></th>'
+    * @default '<th id="{id}" rowspan="{rowspan}" colspan="{colspan}" class="{classnames}" abbr="{abbr}"><div class="'+CLASS_LINER+'">{value}</div></th>'
     */
     thTemplate: TEMPLATE_TH,
 
@@ -883,18 +1004,6 @@ Y.extend(DTBase, Y.Widget, {
     //
     /////////////////////////////////////////////////////////////////////////////
     /**
-     * Updates the UI if changes are made to any of the strings in the strings
-     * attribute.
-     *
-     * @method _afterStringsChange
-     * @param e {Event} Custom event for the attribute change.
-     * @protected
-     */
-    _afterStringsChange: function (e) {
-        this._uiSetStrings(e.newVal);
-    },
-
-    /**
     * @method _setColumnset
     * @description Converts Array to Y.Columnset.
     * @param columns {Array | Y.Columnset}
@@ -906,14 +1015,16 @@ Y.extend(DTBase, Y.Widget, {
     },
 
     /**
-     * Updates the UI if changes are made to Columnset.
+     * Updates the UI if Columnset is changed.
      *
      * @method _afterColumnsetChange
      * @param e {Event} Custom event for the attribute change.
-     * @private
+     * @protected
      */
     _afterColumnsetChange: function (e) {
-        this._uiSetColumnset(e.newVal);
+        if(this.get("rendered")) {
+            this._uiSetColumnset(e.newVal);
+        }
     },
 
     /**
@@ -931,16 +1042,44 @@ Y.extend(DTBase, Y.Widget, {
         rs.addTarget(this);
         return rs;
     },
-
+    
     /**
+    * Updates the UI if Recordset is changed.
+    *
     * @method _afterRecordsetChange
-    * @description Adds bubble target.
-    * @param records {Array | Y.Recordset}
-    * @returns Y.Recordset
-    * @private
+    * @param e {Event} Custom event for the attribute change.
+    * @protected
     */
     _afterRecordsetChange: function (e) {
-        this._uiSetRecordset(e.newVal);
+        if(this.get("rendered")) {
+            this._uiSetRecordset(e.newVal);
+        }
+    },
+
+    /**
+     * Updates the UI if summary is changed.
+     *
+     * @method _afterSummaryChange
+     * @param e {Event} Custom event for the attribute change.
+     * @protected
+     */
+    _afterSummaryChange: function (e) {
+        if(this.get("rendered")) {
+            this._uiSetSummary(e.newVal);
+        }
+    },
+
+    /**
+     * Updates the UI if caption is changed.
+     *
+     * @method _afterCaptionChange
+     * @param e {Event} Custom event for the attribute change.
+     * @protected
+     */
+    _afterCaptionChange: function (e) {
+        if(this.get("rendered")) {
+            this._uiSetCaption(e.newVal);
+        }
     },
 
     /////////////////////////////////////////////////////////////////////////////
@@ -956,6 +1095,10 @@ Y.extend(DTBase, Y.Widget, {
     * @private
     */
     initializer: function(config) {
+        this.after("columnsetChange", this._afterColumnsetChange);
+        this.after("recordsetChange", this._afterRecordsetChange);
+        this.after("summaryChange", this._afterSummaryChange);
+        this.after("captionChange", this._afterCaptionChange);
     },
 
     /**
@@ -967,7 +1110,7 @@ Y.extend(DTBase, Y.Widget, {
     destructor: function() {
          this.get("recordset").removeTarget(this);
     },
-
+    
     ////////////////////////////////////////////////////////////////////////////
     //
     // RENDER
@@ -1020,7 +1163,7 @@ Y.extend(DTBase, Y.Widget, {
     */
     _addColgroupNode: function(tableNode) {
         // Add COLs to DOCUMENT FRAGMENT
-        var len = this.get("columnset").get("keys").length,
+        var len = this.get("columnset").keys.length,
             i = 0,
             allCols = ["<colgroup>"];
 
@@ -1086,8 +1229,7 @@ Y.extend(DTBase, Y.Widget, {
     * @returns Y.Node
     */
     _addCaptionNode: function(tableNode) {
-        //TODO: node.createCaption
-        this._captionNode = tableNode.invoke("createCaption");
+        this._captionNode = tableNode.createCaption();
         return this._captionNode;
     },
 
@@ -1104,8 +1246,8 @@ Y.extend(DTBase, Y.Widget, {
     * @private
     */
     bindUI: function() {
-        var tableNode = this._tableNode,
-            contentBox = this.get("contentBox"),
+        var contentBox = this.get("contentBox"),
+            boundingBox = this.get("boundingBox"),
             theadFilter = "thead."+CLASS_COLUMNS+">tr>th",
             tbodyFilter ="tbody."+CLASS_DATA+">tr>td",
             msgFilter = "tbody."+CLASS_MSG+">tr>td";
@@ -1113,25 +1255,127 @@ Y.extend(DTBase, Y.Widget, {
         // Define custom events that wrap DOM events. Simply pass through DOM
         // event facades.
         //TODO: do we need queuable=true?
-        //TODO: All the other events.
+        //TODO: can i condense this?
+        
+        
+        
+        // FOCUS EVENTS
         /**
-         * Fired when a TH element has a click.
+         * Fired when a TH element has a focus.
          *
-         * @event theadCellClick
+         * @event theadCellFocus
          */
-        this.publish("theadCellClick", {defaultFn: this._defTheadCellClickFn, emitFacade:false, queuable:true});
+        this.publish("theadCellFocus", {defaultFn: this._defTheadCellFocusFn, emitFacade:false, queuable:true});
         /**
-         * Fired when a THEAD>TR element has a click.
+         * Fired when a THEAD>TR element has a focus.
          *
-         * @event theadRowClick
+         * @event theadRowFocus
          */
-        this.publish("theadRowClick", {defaultFn: this._defTheadRowClickFn, emitFacade:false, queuable:true});
+        this.publish("theadRowFocus", {defaultFn: this._defTheadRowFocusFn, emitFacade:false, queuable:true});
         /**
-         * Fired when the THEAD element has a click.
+         * Fired when the THEAD element has a focus.
          *
-         * @event theadClick
+         * @event theadFocus
          */
-        this.publish("theadClick", {defaultFn: this._defTheadClickFn, emitFacade:false, queuable:true});
+        this.publish("theadFocus", {defaultFn: this._defTheadFocusFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.data>TD element has a focus.
+         *
+         * @event tbodyCellFocus
+         */
+        this.publish("tbodyCellFocus", {defaultFn: this._defTbodyCellFocusFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.data>TR element has a focus.
+         *
+         * @event tbodyRowFocus
+         */
+        this.publish("tbodyRowFocus", {defaultFn: this._defTbodyRowFocusFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the TBODY.data element has a focus.
+         *
+         * @event tbodyFocus
+         */
+        this.publish("tbodyFocus", {defaultFn: this._defTbodyFocusFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.msg>TD element has a focus.
+         *
+         * @event msgCellFocus
+         */
+        this.publish("msgCellFocus", {defaultFn: this._defMsgCellFocusFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.msg>TR element has a focus.
+         *
+         * @event msgRowFocus
+         */
+        this.publish("msgRowFocus", {defaultFn: this._defMsgRowFocusFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the TBODY.msg element has a focus.
+         *
+         * @event msgTbodyFocus
+         */
+        this.publish("msgTbodyFocus", {defaultFn: this._defMsgTbodyFocusFn, emitFacade:false, queuable:true});
+
+        
+        
+        // KEYDOWN EVENTS
+        /**
+         * Fired when a TH element has a keydown.
+         *
+         * @event theadCellKeydown
+         */
+        this.publish("theadCellKeydown", {defaultFn: this._defTheadCellKeydownFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a THEAD>TR element has a keydown.
+         *
+         * @event theadRowKeydown
+         */
+        this.publish("theadRowKeydown", {defaultFn: this._defTheadRowKeydownFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the THEAD element has a keydown.
+         *
+         * @event theadKeydown
+         */
+        this.publish("theadKeydown", {defaultFn: this._defTheadKeydownFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.data>TD element has a keydown.
+         *
+         * @event tbodyCellKeydown
+         */
+        this.publish("tbodyCellKeydown", {defaultFn: this._defTbodyCellKeydownFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.data>TR element has a keydown.
+         *
+         * @event tbodyRowKeydown
+         */
+        this.publish("tbodyRowKeydown", {defaultFn: this._defTbodyRowKeydownFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the TBODY.data element has a keydown.
+         *
+         * @event tbodyKeydown
+         */
+        this.publish("tbodyKeydown", {defaultFn: this._defTbodyKeydownFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.msg>TD element has a keydown.
+         *
+         * @event msgCellKeydown
+         */
+        this.publish("msgCellKeydown", {defaultFn: this._defMsgCellKeydownFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.msg>TR element has a keydown.
+         *
+         * @event msgRowKeydown
+         */
+        this.publish("msgRowKeydown", {defaultFn: this._defMsgRowKeydownFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the TBODY.msg element has a keydown.
+         *
+         * @event msgTbodyKeydown
+         */
+        this.publish("msgTbodyKeydown", {defaultFn: this._defMsgTbodyKeydownFn, emitFacade:false, queuable:true});
+
+
+
+        // FOCUS EVENTS
         /**
          * Fired when a TH element has a mouseenter.
          *
@@ -1151,56 +1395,367 @@ Y.extend(DTBase, Y.Widget, {
          */
         this.publish("theadMouseenter", {defaultFn: this._defTheadMouseenterFn, emitFacade:false, queuable:true});
         /**
-         * Fired when a TD element has a click.
+         * Fired when a TBODY.data>TD element has a mouseenter.
+         *
+         * @event tbodyCellMouseenter
+         */
+        this.publish("tbodyCellMouseenter", {defaultFn: this._defTbodyCellMouseenterFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.data>TR element has a mouseenter.
+         *
+         * @event tbodyRowMouseenter
+         */
+        this.publish("tbodyRowMouseenter", {defaultFn: this._defTbodyRowMouseenterFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the TBODY.data element has a mouseenter.
+         *
+         * @event tbodyMouseenter
+         */
+        this.publish("tbodyMouseenter", {defaultFn: this._defTbodyMouseenterFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.msg>TD element has a mouseenter.
+         *
+         * @event msgCellMouseenter
+         */
+        this.publish("msgCellMouseenter", {defaultFn: this._defMsgCellMouseenterFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.msg>TR element has a mouseenter.
+         *
+         * @event msgRowMouseenter
+         */
+        this.publish("msgRowMouseenter", {defaultFn: this._defMsgRowMouseenterFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the TBODY.msg element has a mouseenter.
+         *
+         * @event msgTbodyMouseenter
+         */
+        this.publish("msgTbodyMouseenter", {defaultFn: this._defMsgTbodyMouseenterFn, emitFacade:false, queuable:true});
+
+
+
+        // FOCUS EVENTS
+        /**
+         * Fired when a TH element has a mouseleave.
+         *
+         * @event theadCellMouseleave
+         */
+        this.publish("theadCellMouseleave", {defaultFn: this._defTheadCellMouseleaveFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a THEAD>TR element has a mouseleave.
+         *
+         * @event theadRowMouseleave
+         */
+        this.publish("theadRowMouseleave", {defaultFn: this._defTheadRowMouseleaveFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the THEAD element has a mouseleave.
+         *
+         * @event theadMouseleave
+         */
+        this.publish("theadMouseleave", {defaultFn: this._defTheadMouseleaveFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.data>TD element has a mouseleave.
+         *
+         * @event tbodyCellMouseleave
+         */
+        this.publish("tbodyCellMouseleave", {defaultFn: this._defTbodyCellMouseleaveFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.data>TR element has a mouseleave.
+         *
+         * @event tbodyRowMouseleave
+         */
+        this.publish("tbodyRowMouseleave", {defaultFn: this._defTbodyRowMouseleaveFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the TBODY.data element has a mouseleave.
+         *
+         * @event tbodyMouseleave
+         */
+        this.publish("tbodyMouseleave", {defaultFn: this._defTbodyMouseleaveFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.msg>TD element has a mouseleave.
+         *
+         * @event msgCellMouseleave
+         */
+        this.publish("msgCellMouseleave", {defaultFn: this._defMsgCellMouseleaveFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.msg>TR element has a mouseleave.
+         *
+         * @event msgRowMouseleave
+         */
+        this.publish("msgRowMouseleave", {defaultFn: this._defMsgRowMouseleaveFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the TBODY.msg element has a mouseleave.
+         *
+         * @event msgTbodyMouseleave
+         */
+        this.publish("msgTbodyMouseleave", {defaultFn: this._defMsgTbodyMouseleaveFn, emitFacade:false, queuable:true});
+
+
+
+        // FOCUS EVENTS
+        /**
+         * Fired when a TH element has a mouseup.
+         *
+         * @event theadCellMouseup
+         */
+        this.publish("theadCellMouseup", {defaultFn: this._defTheadCellMouseupFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a THEAD>TR element has a mouseup.
+         *
+         * @event theadRowMouseup
+         */
+        this.publish("theadRowMouseup", {defaultFn: this._defTheadRowMouseupFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the THEAD element has a mouseup.
+         *
+         * @event theadMouseup
+         */
+        this.publish("theadMouseup", {defaultFn: this._defTheadMouseupFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.data>TD element has a mouseup.
+         *
+         * @event tbodyCellMouseup
+         */
+        this.publish("tbodyCellMouseup", {defaultFn: this._defTbodyCellMouseupFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.data>TR element has a mouseup.
+         *
+         * @event tbodyRowMouseup
+         */
+        this.publish("tbodyRowMouseup", {defaultFn: this._defTbodyRowMouseupFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the TBODY.data element has a mouseup.
+         *
+         * @event tbodyMouseup
+         */
+        this.publish("tbodyMouseup", {defaultFn: this._defTbodyMouseupFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.msg>TD element has a mouseup.
+         *
+         * @event msgCellMouseup
+         */
+        this.publish("msgCellMouseup", {defaultFn: this._defMsgCellMouseupFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.msg>TR element has a mouseup.
+         *
+         * @event msgRowMouseup
+         */
+        this.publish("msgRowMouseup", {defaultFn: this._defMsgRowMouseupFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the TBODY.msg element has a mouseup.
+         *
+         * @event msgTbodyMouseup
+         */
+        this.publish("msgTbodyMouseup", {defaultFn: this._defMsgTbodyMouseupFn, emitFacade:false, queuable:true});
+
+
+
+        // FOCUS EVENTS
+        /**
+         * Fired when a TH element has a mousedown.
+         *
+         * @event theadCellMousedown
+         */
+        this.publish("theadCellMousedown", {defaultFn: this._defTheadCellMousedownFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a THEAD>TR element has a mousedown.
+         *
+         * @event theadRowMousedown
+         */
+        this.publish("theadRowMousedown", {defaultFn: this._defTheadRowMousedownFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the THEAD element has a mousedown.
+         *
+         * @event theadMousedown
+         */
+        this.publish("theadMousedown", {defaultFn: this._defTheadMousedownFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.data>TD element has a mousedown.
+         *
+         * @event tbodyCellMousedown
+         */
+        this.publish("tbodyCellMousedown", {defaultFn: this._defTbodyCellMousedownFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.data>TR element has a mousedown.
+         *
+         * @event tbodyRowMousedown
+         */
+        this.publish("tbodyRowMousedown", {defaultFn: this._defTbodyRowMousedownFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the TBODY.data element has a mousedown.
+         *
+         * @event tbodyMousedown
+         */
+        this.publish("tbodyMousedown", {defaultFn: this._defTbodyMousedownFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.msg>TD element has a mousedown.
+         *
+         * @event msgCellMousedown
+         */
+        this.publish("msgCellMousedown", {defaultFn: this._defMsgCellMousedownFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.msg>TR element has a mousedown.
+         *
+         * @event msgRowMousedown
+         */
+        this.publish("msgRowMousedown", {defaultFn: this._defMsgRowMousedownFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the TBODY.msg element has a mousedown.
+         *
+         * @event msgTbodyMousedown
+         */
+        this.publish("msgTbodyMousedown", {defaultFn: this._defMsgTbodyMousedownFn, emitFacade:false, queuable:true});
+
+
+
+        // CLICK EVENTS
+        /**
+         * Fired when a TH element has a click.
+         *
+         * @event theadCellClick
+         */
+        this.publish("theadCellClick", {defaultFn: this._defTheadCellClickFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a THEAD>TR element has a click.
+         *
+         * @event theadRowClick
+         */
+        this.publish("theadRowClick", {defaultFn: this._defTheadRowClickFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the THEAD element has a click.
+         *
+         * @event theadClick
+         */
+        this.publish("theadClick", {defaultFn: this._defTheadClickFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.data>TD element has a click.
          *
          * @event tbodyCellClick
          */
         this.publish("tbodyCellClick", {defaultFn: this._defTbodyCellClickFn, emitFacade:false, queuable:true});
         /**
-         * Fired when a TBODY>TR element has a click.
+         * Fired when a TBODY.data>TR element has a click.
          *
          * @event tbodyRowClick
          */
         this.publish("tbodyRowClick", {defaultFn: this._defTbodyRowClickFn, emitFacade:false, queuable:true});
         /**
-         * Fired when the TBODY element has a click.
+         * Fired when the TBODY.data element has a click.
          *
          * @event tbodyClick
          */
         this.publish("tbodyClick", {defaultFn: this._defTbodyClickFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.msg>TD element has a click.
+         *
+         * @event msgCellClick
+         */
+        this.publish("msgCellClick", {defaultFn: this._defMsgCellClickFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.msg>TR element has a click.
+         *
+         * @event msgRowClick
+         */
+        this.publish("msgRowClick", {defaultFn: this._defMsgRowClickFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the TBODY.msg element has a click.
+         *
+         * @event msgTbodyClick
+         */
+        this.publish("msgTbodyClick", {defaultFn: this._defMsgTbodyClickFn, emitFacade:false, queuable:true});
+        
+        
+        
+        
+        // DBLCLICK EVENTS
+        /**
+         * Fired when a TH element has a dblclick.
+         *
+         * @event theadCellDblclick
+         */
+        this.publish("theadCellDblclick", {defaultFn: this._defTheadCellDblclickFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a THEAD>TR element has a dblclick.
+         *
+         * @event theadRowDblclick
+         */
+        this.publish("theadRowDblclick", {defaultFn: this._defTheadRowDblclickFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the THEAD element has a dblclick.
+         *
+         * @event theadDblclick
+         */
+        this.publish("theadDblclick", {defaultFn: this._defTheadDblclickFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.data>TD element has a dblclick.
+         *
+         * @event tbodyCellDblclick
+         */
+        this.publish("tbodyCellDblclick", {defaultFn: this._defTbodyCellDblclickFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.data>TR element has a dblclick.
+         *
+         * @event tbodyRowDblclick
+         */
+        this.publish("tbodyRowDblclick", {defaultFn: this._defTbodyRowDblclickFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the TBODY.data element has a dblclick.
+         *
+         * @event tbodyDblclick
+         */
+        this.publish("tbodyDblclick", {defaultFn: this._defTbodyDblclickFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.msg>TD element has a dblclick.
+         *
+         * @event msgCellDblclick
+         */
+        this.publish("msgCellDblclick", {defaultFn: this._defMsgCellDblclickFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when a TBODY.msg>TR element has a dblclick.
+         *
+         * @event msgRowDblclick
+         */
+        this.publish("msgRowDblclick", {defaultFn: this._defMsgRowDblclickFn, emitFacade:false, queuable:true});
+        /**
+         * Fired when the TBODY.msg element has a dblclick.
+         *
+         * @event msgTbodyDblclick
+         */
+        this.publish("msgTbodyDblclick", {defaultFn: this._defMsgTbodyDblclickFn, emitFacade:false, queuable:true});
+
+
 
         // Bind to THEAD DOM events
-        tableNode.delegate(FOCUS, this._onDomEvent, theadFilter, this, "theadCellFocus");
-        tableNode.delegate(KEYDOWN, this._onDomEvent, theadFilter, this, "theadCellKeydown");
-        tableNode.delegate(MOUSEENTER, this._onDomEvent, theadFilter, this, "theadCellMouseenter");
-        tableNode.delegate(MOUSELEAVE, this._onDomEvent, theadFilter, this, "theadCellMouseleave");
-        tableNode.delegate(MOUSEUP, this._onDomEvent, theadFilter, this, "theadCellMouseup");
-        tableNode.delegate(MOUSEDOWN, this._onDomEvent, theadFilter, this, "theadCellMousedown");
-        tableNode.delegate(CLICK, this._onDomEvent, theadFilter, this, "theadCellClick");
+        contentBox.delegate(FOCUS, this._onDomEvent, theadFilter, this, "theadCellFocus");
+        contentBox.delegate(KEYDOWN, this._onDomEvent, theadFilter, this, "theadCellKeydown");
+        contentBox.delegate(MOUSEENTER, this._onDomEvent, theadFilter, this, "theadCellMouseenter");
+        contentBox.delegate(MOUSELEAVE, this._onDomEvent, theadFilter, this, "theadCellMouseleave");
+        contentBox.delegate(MOUSEUP, this._onDomEvent, theadFilter, this, "theadCellMouseup");
+        contentBox.delegate(MOUSEDOWN, this._onDomEvent, theadFilter, this, "theadCellMousedown");
+        contentBox.delegate(CLICK, this._onDomEvent, theadFilter, this, "theadCellClick");
         // Since we can't listen for click and dblclick on the same element...
-        contentBox.delegate(DOUBLECLICK, this._onEvent, theadFilter, this, "theadCellDoubleclick");
+        boundingBox.delegate(DBLCLICK, this._onDomEvent, theadFilter, this, "theadCellDblclick");
 
         // Bind to TBODY DOM events
-        tableNode.delegate(FOCUS, this._onDomEvent, tbodyFilter, this, "tbodyCellFocus");
-        tableNode.delegate(KEYDOWN, this._onDomEvent, tbodyFilter, this, "tbodyCellKeydown");
-        tableNode.delegate(MOUSEENTER, this._onDomEvent, tbodyFilter, this, "tbodyCellMouseenter");
-        tableNode.delegate(MOUSELEAVE, this._onDomEvent, tbodyFilter, this, "tbodyCellMouseleave");
-        tableNode.delegate(MOUSEUP, this._onDomEvent, tbodyFilter, this, "tbodyCellMouseup");
-        tableNode.delegate(MOUSEDOWN, this._onDomEvent, tbodyFilter, this, "tbodyCellMousedown");
-        tableNode.delegate(CLICK, this._onDomEvent, tbodyFilter, this, "tbodyCellClick");
+        contentBox.delegate(FOCUS, this._onDomEvent, tbodyFilter, this, "tbodyCellFocus");
+        contentBox.delegate(KEYDOWN, this._onDomEvent, tbodyFilter, this, "tbodyCellKeydown");
+        contentBox.delegate(MOUSEENTER, this._onDomEvent, tbodyFilter, this, "tbodyCellMouseenter");
+        contentBox.delegate(MOUSELEAVE, this._onDomEvent, tbodyFilter, this, "tbodyCellMouseleave");
+        contentBox.delegate(MOUSEUP, this._onDomEvent, tbodyFilter, this, "tbodyCellMouseup");
+        contentBox.delegate(MOUSEDOWN, this._onDomEvent, tbodyFilter, this, "tbodyCellMousedown");
+        contentBox.delegate(CLICK, this._onDomEvent, tbodyFilter, this, "tbodyCellClick");
         // Since we can't listen for click and dblclick on the same element...
-        contentBox.delegate(DOUBLECLICK, this._onEvent, tbodyFilter, this, "tbodyCellDoubleclick");
+        boundingBox.delegate(DBLCLICK, this._onDomEvent, tbodyFilter, this, "tbodyCellDblclick");
 
         // Bind to message TBODY DOM events
-        tableNode.delegate(FOCUS, this._onDomEvent, msgFilter, this, "msgCellFocus");
-        tableNode.delegate(KEYDOWN, this._onDomEvent, msgFilter, this, "msgCellKeydown");
-        tableNode.delegate(MOUSEENTER, this._onDomEvent, msgFilter, this, "msgCellMouseenter");
-        tableNode.delegate(MOUSELEAVE, this._onDomEvent, msgFilter, this, "msgCellMouseleave");
-        tableNode.delegate(MOUSEUP, this._onDomEvent, msgFilter, this, "msgCellMouseup");
-        tableNode.delegate(MOUSEDOWN, this._onDomEvent, msgFilter, this, "msgCellMousedown");
-        tableNode.delegate(CLICK, this._onDomEvent, msgFilter, this, "msgCellClick");
+        contentBox.delegate(FOCUS, this._onDomEvent, msgFilter, this, "msgCellFocus");
+        contentBox.delegate(KEYDOWN, this._onDomEvent, msgFilter, this, "msgCellKeydown");
+        contentBox.delegate(MOUSEENTER, this._onDomEvent, msgFilter, this, "msgCellMouseenter");
+        contentBox.delegate(MOUSELEAVE, this._onDomEvent, msgFilter, this, "msgCellMouseleave");
+        contentBox.delegate(MOUSEUP, this._onDomEvent, msgFilter, this, "msgCellMouseup");
+        contentBox.delegate(MOUSEDOWN, this._onDomEvent, msgFilter, this, "msgCellMousedown");
+        contentBox.delegate(CLICK, this._onDomEvent, msgFilter, this, "msgCellClick");
         // Since we can't listen for click and dblclick on the same element...
-        contentBox.delegate(DOUBLECLICK, this._onDomEvent, msgFilter, this, "msgCellDoubleclick");
+        boundingBox.delegate(DBLCLICK, this._onDomEvent, msgFilter, this, "msgCellDblclick");
     },
     
     /**
@@ -1244,20 +1799,10 @@ Y.extend(DTBase, Y.Widget, {
         this._uiSetColumnset(this.get("columnset"));
         // DATA ROWS
         this._uiSetRecordset(this.get("recordset"));
-        // STRINGS
-        this._uiSetStrings(this.get("strings"));
-    },
-
-    /**
-     * Updates all strings.
-     *
-     * @method _uiSetStrings
-     * @param strings {Object} Collection of new strings.
-     * @protected
-     */
-    _uiSetStrings: function (strings) {
-        this._uiSetSummary(strings.summary);
-        this._uiSetCaption(strings.caption);
+        // SUMMARY
+        this._uiSetSummary(this.get("summary"));
+        // CAPTION
+        this._uiSetCaption(this.get("caption"));
     },
 
     /**
@@ -1268,6 +1813,7 @@ Y.extend(DTBase, Y.Widget, {
      * @protected
      */
     _uiSetSummary: function(val) {
+        val = YisValue(val) ? val : "";
         this._tableNode.set("summary", val);
     },
 
@@ -1279,6 +1825,7 @@ Y.extend(DTBase, Y.Widget, {
      * @protected
      */
     _uiSetCaption: function(val) {
+        val = YisValue(val) ? val : "";
         this._captionNode.setContent(val);
     },
 
@@ -1296,7 +1843,7 @@ Y.extend(DTBase, Y.Widget, {
      * @protected
      */
     _uiSetColumnset: function(cs) {
-        var tree = cs.get("tree"),
+        var tree = cs.tree,
             thead = this._theadNode,
             i = 0,
             len = tree.length,
@@ -1392,6 +1939,8 @@ Y.extend(DTBase, Y.Widget, {
     _addTheadThNode: function(o) {
         o.th = this._createTheadThNode(o);
         this._attachTheadThNode(o);
+        //TODO: assign all node pointers: thNode, thLinerNode, thLabelNode
+        o.column.thNode = o.th;
     },
 
     /**
@@ -1407,9 +1956,9 @@ Y.extend(DTBase, Y.Widget, {
         
         // Populate template object
         o.id = column.get("id");//TODO: validate 1 column ID per document
-        o.colspan = column.get("colSpan");
-        o.rowspan = column.get("rowSpan");
-        //TODO o.abbr = column.get("abbr");
+        o.colspan = column.colSpan;
+        o.rowspan = column.rowSpan;
+        o.abbr = column.get("abbr");
         o.classnames = column.get("classnames");
         o.value = Ysubstitute(this.get("thValueTemplate"), o);
 
@@ -1420,15 +1969,13 @@ Y.extend(DTBase, Y.Widget, {
         }
         */
         
-        //column._set("thNode", o.th);
-
         return Ycreate(Ysubstitute(this.thTemplate, o));
     },
 
     /**
     * Attaches header cell element.
     *
-    * @method _attachTheadTrNode
+    * @method _attachTheadThNode
     * @param o {Object} {value, column, tr}.
     * @protected
     */
@@ -1451,14 +1998,21 @@ Y.extend(DTBase, Y.Widget, {
     _uiSetRecordset: function(rs) {
         var i = 0,//TODOthis.get("state.offsetIndex")
             len = rs.getLength(), //TODOthis.get("state.pageLength")
-            tbody = this._tbodyNode,
-            parent = tbody.get("parentNode"),
-            nextSibling = tbody.next(),
-            o = {tbody:tbody}; //TODO: not sure best time to do this -- depends on sdt
+            oldTbody = this._tbodyNode,
+            parent = oldTbody.get("parentNode"),
+            nextSibling = oldTbody.next(),
+            o = {},
+            newTbody;
 
-        // Move TBODY off DOM
-        tbody.remove();
-
+        // Replace TBODY with a new one
+        //TODO: split _addTbodyNode into create/attach
+        oldTbody.remove();
+        oldTbody = null;
+        newTbody = this._addTbodyNode(this._tableNode);
+        newTbody.remove();
+        this._tbodyNode = newTbody;
+        o.tbody = newTbody;
+        
         // Iterate Recordset to use existing TR when possible or add new TR
         for(; i<len; ++i) {
             o.record = rs.getRecord(i);
@@ -1466,8 +2020,8 @@ Y.extend(DTBase, Y.Widget, {
             this._addTbodyTrNode(o); //TODO: sometimes rowindex != recordindex
         }
         
-        // Re-attach TBODY to DOM
-        parent.insert(tbody, nextSibling);
+        // TBODY to DOM
+        parent.insert(this._tbodyNode, nextSibling);
     },
 
     /**
@@ -1495,7 +2049,7 @@ Y.extend(DTBase, Y.Widget, {
     _createTbodyTrNode: function(o) {
         var tr = Ycreate(Ysubstitute(this.get("trTemplate"), {id:o.record.get("id")})),
             i = 0,
-            allKeys = this.get("columnset").get("keys"),
+            allKeys = this.get("columnset").keys,
             len = allKeys.length;
 
         o.tr = tr;
@@ -1555,7 +2109,7 @@ Y.extend(DTBase, Y.Widget, {
     _createTbodyTdNode: function(o) {
         var column = o.column;
         //TODO: attributes? or methods?
-        o.headers = column.get("headers");
+        o.headers = column.headers;
         o.classnames = column.get("classnames");
         o.value = this.formatDataCell(o);
         return Ycreate(Ysubstitute(this.tdTemplate, o));
@@ -1579,17 +2133,204 @@ Y.extend(DTBase, Y.Widget, {
      * @param @param o {Object} {record, column, tr, headers, classnames}.
      */
     formatDataCell: function(o) {
-        var record = o.record;
+        var record = o.record,
+            column = o.column,
+            formatter = column.get("formatter");
         o.data = record.get("data");
-        o.value = record.getValue(o.column.get("key"));
-        return Ysubstitute(this.get("tdValueTemplate"), o);
+        o.value = record.getValue(column.get("field"));
+        return YLang.isString(formatter) ?
+            Ysubstitute(formatter, o) : // Custom template
+            YLang.isFunction(formatter) ?
+                formatter.call(this, o) :  // Custom function
+                Ysubstitute(this.get("tdValueTemplate"), o);  // Default template
     }
 });
 
 Y.namespace("DataTable").Base = DTBase;
 
 
-}, '@VERSION@' ,{requires:['intl','substitute','widget','recordset-base'], lang:['en']});
+}, '@VERSION@' ,{requires:['substitute','widget','recordset-base']});
+YUI.add('datatable-datasource', function(Y) {
+
+/**
+ * Plugs DataTable with DataSource integration.
+ *
+ * @module datatable
+ * @submodule datatable-datasource
+ */
+
+/**
+ * Adds DataSource integration to DataTable.
+ * @class DataTableDataSource
+ * @extends Plugin.Base
+ */
+function DataTableDataSource() {
+    DataTableDataSource.superclass.constructor.apply(this, arguments);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// STATIC PROPERTIES
+//
+/////////////////////////////////////////////////////////////////////////////
+Y.mix(DataTableDataSource, {
+    /**
+     * The namespace for the plugin. This will be the property on the host which
+     * references the plugin instance.
+     *
+     * @property NS
+     * @type String
+     * @static
+     * @final
+     * @value "datasource"
+     */
+    NS: "datasource",
+
+    /**
+     * Class name.
+     *
+     * @property NAME
+     * @type String
+     * @static
+     * @final
+     * @value "dataTableDataSource"
+     */
+    NAME: "dataTableDataSource",
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// ATTRIBUTES
+//
+/////////////////////////////////////////////////////////////////////////////
+    ATTRS: {
+        /**
+        * @attribute datasource
+        * @description Pointer to DataSource instance.
+        * @type Y.DataSource
+        */
+        datasource: {
+            setter: "_setDataSource"
+        },
+        
+        /**
+        * @attribute initialRequest
+        * @description Request sent to DataSource immediately upon initialization.
+        * @type Object
+        */
+        initialRequest: {
+            setter: "_setInitialRequest"
+        }
+    }
+});
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// PROTOTYPE
+//
+/////////////////////////////////////////////////////////////////////////////
+Y.extend(DataTableDataSource, Y.Plugin.Base, {
+    /////////////////////////////////////////////////////////////////////////////
+    //
+    // ATTRIBUTE HELPERS
+    //
+    /////////////////////////////////////////////////////////////////////////////
+    /**
+    * @method _setDataSource
+    * @description Creates new DataSource instance if one is not provided.
+    * @param ds {Object | Y.DataSource}
+    * @returns Y.DataSource
+    * @private
+    */
+    _setDataSource: function(ds) {
+        return ds || new Y.DataSource.Local(ds);
+    },
+
+    /**
+    * @method _setInitialRequest
+    * @description Sends request to DataSource.
+    * @param request {Object} DataSource request.
+    * @private
+    */
+    _setInitialRequest: function(request) {
+    },
+
+    /////////////////////////////////////////////////////////////////////////////
+    //
+    // METHODS
+    //
+    /////////////////////////////////////////////////////////////////////////////
+    /**
+    * Initializer.
+    *
+    * @method initializer
+    * @param config {Object} Config object.
+    * @private
+    */
+    initializer: function(config) {
+        if(!Y.Lang.isUndefined(config.initialRequest)) {
+            this.load({request:config.initialRequest});
+        }
+    },
+
+    ////////////////////////////////////////////////////////////////////////////
+    //
+    // DATA
+    //
+    ////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Load data by calling DataSource's sendRequest() method under the hood.
+     *
+     * @method load
+     * @param config {object} Optional configuration parameters:
+     *
+     * <dl>
+     * <dt>request</dt><dd>Pass in a new request, or initialRequest is used.</dd>
+     * <dt>callback</dt><dd>Pass in DataSource callback object, or the following default is used:
+     *    <dl>
+     *      <dt>success</dt><dd>datatable.onDataReturnInitializeTable</dd>
+     *      <dt>failure</dt><dd>datatable.onDataReturnInitializeTable</dd>
+     *      <dt>scope</dt><dd>datatable</dd>
+     *      <dt>argument</dt><dd>datatable.getState()</dd>
+     *    </dl>
+     * </dd>
+     * <dt>datasource</dt><dd>Pass in a new DataSource instance to override the current DataSource for this transaction.</dd>
+     * </dl>
+     */
+    load: function(config) {
+        config = config || {};
+        config.request = config.request || this.get("initialRequest");
+        config.callback = config.callback || {
+            success: Y.bind(this.onDataReturnInitializeTable, this),
+            failure: Y.bind(this.onDataReturnInitializeTable, this),
+            argument: this.get("host").get("state") //TODO
+        };
+
+        var ds = (config.datasource || this.get("datasource"));
+        if(ds) {
+            ds.sendRequest(config);
+        }
+    },
+
+    /**
+     * Callback function passed to DataSource's sendRequest() method populates
+     * an entire DataTable with new data, clearing previous data, if any.
+     *
+     * @method onDataReturnInitializeTable
+     * @param e {Event.Facade} DataSource Event Facade object.
+     */
+    onDataReturnInitializeTable : function(e) {
+        this.get("host").set("recordset", new Y.Recordset({records: e.response.results}));
+    }
+});
+
+Y.namespace("Plugin").DataTableDataSource = DataTableDataSource;
+
+
+
+
+
+}, '@VERSION@' ,{requires:['plugin','datatable-base','datasource-local']});
 YUI.add('datatable-sort', function(Y) {
 
 /**
@@ -1607,12 +2348,9 @@ YUI.add('datatable-sort', function(Y) {
 var YgetClassName = Y.ClassNameManager.getClassName,
 
     DATATABLE = "datatable",
+    COLUMN = "column",
     ASC = "asc",
     DESC = "desc",
-    
-    CLASS_ASC = YgetClassName(DATATABLE, "asc"),
-    CLASS_DESC = YgetClassName(DATATABLE, "desc"),
-    CLASS_SORTABLE = YgetClassName(DATATABLE, "sortable"),
 
     //TODO: Don't use hrefs - use tab/arrow/enter
     TEMPLATE = '<a class="{link_class}" title="{link_title}" href="{link_href}">{value}</a>';
@@ -1663,7 +2401,7 @@ Y.mix(DataTableSort, {
         * column to sort.
         * @type String
         * @default "theadCellClick"
-        * @initOnly
+        * @writeOnce "initOnly"
         */
         trigger: {
             value: "theadCellClick",
@@ -1671,12 +2409,14 @@ Y.mix(DataTableSort, {
         },
         
         /**
-        * @attribute sortedBy
-        * @description Sort state: {field,dir}
+        * @attribute lastSortedBy
+        * @description Describes last known sort state: {key,dir}, where
+        * "key" is column key and "dir" is either "asc" or "desc".
         * @type Object
         */
-        sortedBy: {
-            value: null
+        lastSortedBy: {
+            setter: "_setLastSortedBy",
+            lazyAdd: false
         },
         
         /**
@@ -1719,32 +2459,88 @@ Y.extend(DataTableSort, Y.Plugin.Base, {
         this.doBefore("_createTheadThNode", this._beforeCreateTheadThNode);
         
         // Add class
-        this.doBefore("_attachTheadThNode", function(o) {
-            if(o.column.get("sortable")) {
-                o.th.addClass(CLASS_SORTABLE);
-            }
-        });
+        this.doBefore("_attachTheadThNode", this._beforeAttachTheadThNode);
+        this.doBefore("_attachTbodyTdNode", this._beforeAttachTbodyTdNode);
 
         // Attach trigger handlers
-        dt.on(this.get("trigger"), this._onEventSortColumn);
+        dt.on(this.get("trigger"), Y.bind(this._onEventSortColumn,this));
 
         // Attach UI hooks
         dt.after("recordsetSort:sort", function() {
-            dt._uiSetRecordset(dt.get("recordset"));
+            this._uiSetRecordset(this.get("recordset"));
         });
-        dt.after("sortedByChangeEvent", function() {
-            //alert('ok');
+        this.on("lastSortedByChange", function(e) {
+            this._uiSetLastSortedBy(e.prevVal, e.newVal, dt);
         });
 
         //TODO
-        //dt.after("recordset:mutation", function() {//reset sortedBy});
+        //dt.after("recordset:mutation", function() {//reset lastSortedBy});
         
         //TODO
         //add Column sortFn ATTR
         
-        // Update UI after the fact (plug-then-render case)
+        // Update UI after the fact (render-then-plug case)
         if(dt.get("rendered")) {
             dt._uiSetColumnset(dt.get("columnset"));
+            this._uiSetLastSortedBy(null, this.get("lastSortedBy"), dt);
+        }
+    },
+
+    /**
+    * @method _setLastSortedBy
+    * @description Normalizes lastSortedBy
+    * @param val {String | Object} {key, dir} or "key"
+    * @returns {key, dir, notdir}
+    * @private
+    */
+    _setLastSortedBy: function(val) {
+        if(Y.Lang.isString(val)) {
+            return {key:val, dir:"asc", notdir:"desc"};
+        }
+        else if (val && val.key) {
+            if(val.dir === "desc") {
+                return {key:val.key, dir:"desc", notdir:"asc"};
+            }
+            else {
+                return {key:val.key, dir:"asc", notdir:"desc"};
+            }
+        }
+        else {
+            return null;
+        }
+    },
+
+    /**
+     * Updates sort UI.
+     *
+     * @method _uiSetLastSortedBy
+     * @param val {Object} New lastSortedBy object {key,dir}.
+     * @param dt {Y.DataTable.Base} Host.
+     * @protected
+     */
+    _uiSetLastSortedBy: function(prevVal, newVal, dt) {
+        var prevKey = prevVal && prevVal.key,
+            prevDir = prevVal && prevVal.dir,
+            newKey = newVal && newVal.key,
+            newDir = newVal && newVal.dir,
+            cs = dt.get("columnset"),
+            prevColumn = cs.keyHash[prevKey],
+            newColumn = cs.keyHash[newKey],
+            tbodyNode = dt._tbodyNode,
+            prevRowList, newRowList;
+
+        // Clear previous UI
+        if(prevColumn) {
+            prevColumn.thNode.removeClass(YgetClassName(DATATABLE, prevDir));
+            prevRowList = tbodyNode.all("."+YgetClassName(COLUMN, prevColumn.get("id")));
+            prevRowList.removeClass(YgetClassName(DATATABLE, prevDir));
+        }
+
+        // Add new sort UI
+        if(newColumn) {
+            newColumn.thNode.addClass(YgetClassName(DATATABLE, newDir));
+            newRowList = tbodyNode.all("."+YgetClassName(COLUMN, newColumn.get("id")));
+            newRowList.addClass(YgetClassName(DATATABLE, newDir));
         }
     },
 
@@ -1758,35 +2554,82 @@ Y.extend(DataTableSort, Y.Plugin.Base, {
     _beforeCreateTheadThNode: function(o) {
         if(o.column.get("sortable")) {
             o.value = Y.substitute(this.get("template"), {
-                link_class: "foo",
-                link_title: "bar",
-                link_href: "bat",
+                link_class: o.link_class || "",
+                link_title: "title",
+                link_href: "#",
                 value: o.value
             });
         }
     },
 
     /**
-    * In response to the "trigger" event, sorts the underlying Recordset and
-    * updates the sortedBy attribute.
+    * Before header cell element is attached, sets applicable class names.
     *
-    * @method _beforeCreateTheadThNode
+    * @method _beforeAttachTheadThNode
+    * @param o {Object} {value, column, tr}.
+    * @protected
+    */
+    _beforeAttachTheadThNode: function(o) {
+        var lastSortedBy = this.get("lastSortedBy"),
+            key = lastSortedBy && lastSortedBy.key,
+            dir = lastSortedBy && lastSortedBy.dir,
+            notdir = lastSortedBy && lastSortedBy.notdir;
+
+        // This Column is sortable
+        if(o.column.get("sortable")) {
+            o.th.addClass(YgetClassName(DATATABLE, "sortable"));
+        }
+        // This Column is currently sorted
+        if(key && (key === o.column.get("key"))) {
+            o.th.replaceClass(YgetClassName(DATATABLE, notdir), YgetClassName(DATATABLE, dir));
+        }
+    },
+
+    /**
+    * Before header cell element is attached, sets applicable class names.
+    *
+    * @method _before_beforeAttachTbodyTdNode
+    * @param o {Object} {record, column, tr, headers, classnames, value}.
+    * @protected
+    */
+    _beforeAttachTbodyTdNode: function(o) {
+        var lastSortedBy = this.get("lastSortedBy"),
+            key = lastSortedBy && lastSortedBy.key,
+            dir = lastSortedBy && lastSortedBy.dir,
+            notdir = lastSortedBy && lastSortedBy.notdir;
+
+        // This Column is sortable
+        if(o.column.get("sortable")) {
+            o.td.addClass(YgetClassName(DATATABLE, "sortable"));
+        }
+        // This Column is currently sorted
+        if(key && (key === o.column.get("key"))) {
+            o.td.replaceClass(YgetClassName(DATATABLE, notdir), YgetClassName(DATATABLE, dir));
+        }
+    },
+    /**
+    * In response to the "trigger" event, sorts the underlying Recordset and
+    * updates the lastSortedBy attribute.
+    *
+    * @method _onEventSortColumn
     * @param o {Object} {value, column, tr}.
     * @protected
     */
     _onEventSortColumn: function(e) {
         e.halt();
         //TODO: normalize e.currentTarget to TH
-        var column = this.get("columnset").get("hash")[e.currentTarget.get("id")],
+        var dt = this.get("host"),
+            column = dt.get("columnset").idHash[e.currentTarget.get("id")],
+            key = column.get("key"),
             field = column.get("field"),
-            prevSortedBy = this.get("sortedBy"),
-            dir = (prevSortedBy &&
-                prevSortedBy.field === field &&
-                prevSortedBy.dir === ASC) ? DESC : ASC,
+            lastSortedBy = this.get("lastSortedBy"),
+            dir = (lastSortedBy &&
+                lastSortedBy.key === key &&
+                lastSortedBy.dir === ASC) ? DESC : ASC,
             sorter = column.get("sortFn");
         if(column.get("sortable")) {
-            this.get("recordset").sort.sort(field, dir === DESC, sorter);
-            this.set("sortedBy", {field: field, dir: dir});
+            dt.get("recordset").sort.sort(field, dir === DESC, sorter);
+            this.set("lastSortedBy", {key: key, dir: dir});
         }
     }
 });
@@ -1807,22 +2650,23 @@ YUI.add('datatable-scroll', function(Y) {
  */
 
 
-var YDo = Y.Do,
-	YNode = Y.Node,
+var YNode = Y.Node,
 	YLang = Y.Lang,
 	YUA = Y.UA,
-	YStyleSheet = Y.StyleSheet,
 	YgetClassName = Y.ClassNameManager.getClassName,
 	DATATABLE = "datatable",
 	CLASS_HEADER = YgetClassName(DATATABLE, "hd"),
 	CLASS_BODY = YgetClassName(DATATABLE, "bd"),
-	CLASS_LINER = YgetClassName(DATATABLE, "liner"),
 	CLASS_SCROLLABLE = YgetClassName(DATATABLE, "scrollable"),
 	CONTAINER_HEADER = '<div class="'+CLASS_HEADER+'"></div>',
 	CONTAINER_BODY = '<div class="'+CLASS_BODY+'"></div>',
 	TEMPLATE_TABLE = '<table></table>';
 	
-
+/**
+ * Adds scrolling to DataTable.
+ * @class DataTableScroll
+ * @extends Plugin.Base
+ */
 function DataTableScroll() {
     DataTableScroll.superclass.constructor.apply(this, arguments);
 }
@@ -1835,40 +2679,56 @@ Y.mix(DataTableScroll, {
     ATTRS: {
 	
 		/**
-	    * @description The width for the table. Set to a string (ex: "200px", "20em")
+	    * @description The width for the table. Set to a string (ex: "200px", "20em") if you want the table to scroll in the x direction.
 	    *
 	    * @attribute width
 	    * @public
-	    * @static
 	    * @type string
 	    */
         width: {
-			value: undefined
+			value: undefined,
+			writeOnce: "initOnly"
 		},
 		
 		/**
-	    * @description The height for the table. Set to a string (ex: "200px", "20em")
+	    * @description The height for the table. Set to a string (ex: "200px", "20em") if you want the table to scroll in the y-direction.
 	    *
 	    * @attribute height
 	    * @public
-	    * @static
 	    * @type string
 	    */
 		height: {
-			value: undefined
+			value: undefined,
+			writeOnce: "initOnly"
 		},
 		
 		
 		/**
-	    * @description The scrolling direction for the table. Can be set to 'x', 'y', or 'xy'
+	    * @description The scrolling direction for the table.
 	    *
 	    * @attribute scroll
-	    * @public
-	    * @static
+	    * @private
 	    * @type string
 	    */
-		scroll: {
-			value: 'y'
+		_scroll: {
+			//value: 'y',
+			valueFn: function() {
+			    var w = this.get('width'),
+			    h = this.get('height');
+			    
+			    if (w && h) {
+			        return 'xy';
+			    }
+			    else if (w) {
+			        return 'x';
+			    }
+			    else if (h) {
+			        return 'y';
+			    }
+			    else {
+			        return null;
+			    }
+			}
 		},
 		
 		
@@ -1877,7 +2737,6 @@ Y.mix(DataTableScroll, {
 	    *
 	    * @attribute COLOR_COLUMNFILLER
 	    * @public
-	    * @static
 	    * @type string
 	    */
 		COLOR_COLUMNFILLER: {
@@ -1990,24 +2849,24 @@ Y.extend(DataTableScroll, Y.Plugin.Base, {
     * @private
     */			
 	_setUpNodes: function() {
-		var dt = this.get('host');
 		
 		this.afterHostMethod("_addTableNode", this._setUpParentTableNode);
 		this.afterHostMethod("_addTheadNode", this._setUpParentTheadNode); 
 		this.afterHostMethod("_addTbodyNode", this._setUpParentTbodyNode);
 		this.afterHostMethod("_addMessageNode", this._setUpParentMessageNode);
-       	
+		//this.beforeHostMethod('renderUI', this._removeCaptionNode);
 		this.afterHostMethod("renderUI", this.renderUI);
 		this.afterHostMethod("syncUI", this.syncUI);
 		
-		if (this.get('scroll') !== 'x') {
+		if (this.get('_scroll') !== 'x') {
 			this.afterHostMethod('_attachTheadThNode', this._attachTheadThNode);
 			this.afterHostMethod('_attachTbodyTdNode', this._attachTbodyTdNode);
 		}
+		
 	},
 		
 	/**
-    * @description Stores the main <table> node provided by the host as a private property
+    * @description Stores the main &lt;table&gt; node provided by the host as a private property
     *
     * @method _setUpParentTableNode
     * @private
@@ -2018,7 +2877,7 @@ Y.extend(DataTableScroll, Y.Plugin.Base, {
 	
 	
 	/**
-    * @description Stores the main <thead> node provided by the host as a private property
+    * @description Stores the main &lt;thead&gt; node provided by the host as a private property
     *
     * @method _setUpParentTheadNode
     * @private
@@ -2028,7 +2887,7 @@ Y.extend(DataTableScroll, Y.Plugin.Base, {
 	},
 	
 	/**
-    * @description Stores the main <tbody> node provided by the host as a private property
+    * @description Stores the main &lt;tbody&gt; node provided by the host as a private property
     *
     * @method _setUpParentTbodyNode
     * @private
@@ -2039,7 +2898,7 @@ Y.extend(DataTableScroll, Y.Plugin.Base, {
 	
 	
 	/**
-    * @description Stores the main <tbody> message node provided by the host as a private property
+    * @description Stores the main &lt;tbody&gt; message node provided by the host as a private property
     *
     * @method _setUpParentMessageNode
     * @private
@@ -2056,7 +2915,7 @@ Y.extend(DataTableScroll, Y.Plugin.Base, {
 	
 	/**
     * @description Primary rendering method that takes the datatable rendered in
-    * the host, and splits it up into two separate <divs> each containing two 
+    * the host, and splits it up into two separate &lt;divs&gt; each containing two 
 	* separate tables (one containing the head and one containing the body). 
 	* This method fires after renderUI is called on datatable-base.
 	* 
@@ -2075,8 +2934,8 @@ Y.extend(DataTableScroll, Y.Plugin.Base, {
 	
 	/**
     * @description Post rendering method that is responsible for creating a column
-	* filler, and performing width and scroll synchronization between the <th> 
-	* elements and the <td> elements.
+	* filler, and performing width and scroll synchronization between the &lt;th&gt; 
+	* elements and the &lt;td&gt; elements.
 	* This method fires after syncUI is called on datatable-base
 	* 
     * @method syncUI
@@ -2084,6 +2943,7 @@ Y.extend(DataTableScroll, Y.Plugin.Base, {
     */
 	syncUI: function() {
 		//Y.Profiler.start('sync');
+		this._removeCaptionNode();
 		this._syncWidths();
 		this._syncScroll();
 		//Y.Profiler.stop('sync');
@@ -2091,7 +2951,18 @@ Y.extend(DataTableScroll, Y.Plugin.Base, {
 		
 	},
 	
-	
+	/**
+    * @description Remove the caption created in base. Scrolling datatables dont support captions.
+	* 
+    * @method _removeCaptionNode
+    * @private
+    */
+    _removeCaptionNode: function() {
+        this.get('host')._captionNode.remove();
+        //Y.DataTable.Base.prototype.createCaption = function(v) {/*do nothing*/};
+		//Y.DataTable.Base.prototype._uiSetCaption = function(v) {/*do nothing*/};
+    },
+
 	/**
     * @description Adjusts the width of the TH and the TDs to make sure that the two are in sync
 	* 
@@ -2164,7 +3035,7 @@ Y.extend(DataTableScroll, Y.Plugin.Base, {
 					//if TD is bigger than TH, enlarge TH Liner
 					else if (tdWidth > thWidth) {
 						thLiner.setStyle('width', (tdWidth - 20 + 'px'));
-						//tdLiner.setStyle('width', (tdWidth - 20 + 'px'));
+						tdLiner.setStyle('width', (tdWidth - 20 + 'px')); //if you don't set an explicit width here, when the width is set in line 368, it will auto-shrink the widths of the other cells (because they dont have an explicit width)
 						//stylesheet.set(className,{'width': (tdWidth - 20 + 'px')});
 					}
 					
@@ -2173,14 +3044,7 @@ Y.extend(DataTableScroll, Y.Plugin.Base, {
 			}
 			
 			//stylesheet.enable();
-			
-			//After the widths have synced, there is a wrapping issue in the headerContainer in IE6. The header does not span the full
-			//length of the table (does not cover all of the y-scrollbar). By adding this line in when there is a y-scroll, the header will span correctly.
-			
-			//TODO: this should not really occur on this.get('scroll') === y - it should occur when scrollHeight > clientHeight, but clientHeight is not getting recognized in IE6?
-			if (ie && this.get('scroll') === 'y' && this._bodyContainerNode.get('scrollHeight') > this._bodyContainerNode.get('offsetHeight')) {
-				this._headerContainerNode.setStyle('width', this._parentContainer.get('offsetWidth')+ 15 +'px');
-			}		
+
 	},
 	
 	/**
@@ -2193,7 +3057,7 @@ Y.extend(DataTableScroll, Y.Plugin.Base, {
 		var w = o.column.get('width') || 'auto';
 		
 		if (w !== 'auto') {
-			o.th.get('firstChild').setStyles({'width': w, 'overflow':'hidden'}); //TODO: use liner API but liner is undefined here (not created?)
+			o.th.get('firstChild').setStyles({width: w, overflow:'hidden'}); //TODO: use liner API but liner is undefined here (not created?)
 		}
 		return o;
 	},
@@ -2208,7 +3072,7 @@ Y.extend(DataTableScroll, Y.Plugin.Base, {
 		var w = o.column.get('width') || 'auto';
 		
 		if (w !== 'auto') {
-			o.td.get('firstChild').setStyles({'width': w, 'overflow': 'hidden'}); //TODO: use liner API but liner is undefined here (not created?)
+			o.td.get('firstChild').setStyles({width: w, overflow: 'hidden'}); //TODO: use liner API but liner is undefined here (not created?)
 			//o.td.setStyles({'width': w, 'overflow': 'hidden'});
 		}
 		return o;
@@ -2233,7 +3097,7 @@ Y.extend(DataTableScroll, Y.Plugin.Base, {
 	},
 	
 	/**
-    * @description Creates the DIV that contains a <table> with all the headers. 
+    * @description Creates the DIV that contains a &lt;table&gt; with all the headers. 
 	*
     * @method _createHeaderContainer
     * @private
@@ -2259,25 +3123,31 @@ Y.extend(DataTableScroll, Y.Plugin.Base, {
     * @private
     */
 	_setStylesForTbody: function() {
-		var dir = this.get('scroll'),
+		var dir = this.get('_scroll'),
 			w = this.get('width') || "",
 			h = this.get('height') || "",
 			el = this._bodyContainerNode,
-			styles = {'width':"", 'height':h};
+			styles = {width:"", height:h};
 				
 		if (dir === 'x') {
 			//X-Scrolling tables should not have a Y-Scrollbar so overflow-y is hidden. THe width on x-scrolling tables must be set by user.
-			styles['overflowY'] = 'hidden';
-			styles['width'] = w;
+			styles.overflowY = 'hidden';
+			styles.width = w;
 		}
 		else if (dir === 'y') {
 			//Y-Scrolling tables should not have a X-Scrollbar so overflow-x is hidden. The width isn't neccessary because it can be auto.
-			styles['overflowX'] = 'hidden';
+			styles.overflowX = 'hidden';
+		}
+		
+		else if (dir === 'xy') {
+			styles.width = w;
 		}
 		
 		else {
-			//assume xy - the width must be set on xy.
-			styles['width'] = w;
+		    //scrolling is set to 'null' - ie: width and height are not set. Don't have any type of scrolling.
+		    styles.overflowX = 'hidden';
+		    styles.overflowY = 'hidden';
+		    styles.width = w;
 		}
 		
 		el.setStyles(styles);
@@ -2292,8 +3162,7 @@ Y.extend(DataTableScroll, Y.Plugin.Base, {
     * @private
     */
 	_setStylesForThead: function() {
-		var dir = this.get('scroll'),
-			w = this.get('width') || "",
+		var w = this.get('width') || "",
 			el = this._headerContainerNode;
 		
 		//if (dir !== 'y') {
@@ -2309,7 +3178,7 @@ Y.extend(DataTableScroll, Y.Plugin.Base, {
     */
 	_setContentBoxDimensions: function() {
 		
-		if (this.get('scroll') === 'y' || (!this.get('width'))) {
+		if (this.get('_scroll') === 'y' || (!this.get('width'))) {
 			this._parentContainer.setStyle('width', 'auto');
 		}
 		
@@ -2423,7 +3292,13 @@ Y.extend(DataTableScroll, Y.Plugin.Base, {
 		
 		this._setOverhangValue(padding);
 		
-
+		//After the widths have synced, there is a wrapping issue in the headerContainer in IE6. The header does not span the full
+		//length of the table (does not cover all of the y-scrollbar). By adding this line in when there is a y-scroll, the header will span correctly.
+		//TODO: this should not really occur on this.get('_scroll') === y - it should occur when scrollHeight > clientHeight, but clientHeight is not getting recognized in IE6?
+		if (YUA.ie !== 0 && this.get('_scroll') === 'y' && this._bodyContainerNode.get('scrollHeight') > this._bodyContainerNode.get('offsetHeight'))
+		{
+			this._headerContainerNode.setStyle('width', this._parentContainer.get('width'));
+		}
 	},
 	
 	
@@ -2457,5 +3332,5 @@ Y.namespace("Plugin").DataTableScroll = DataTableScroll;
 }, '@VERSION@' ,{requires:['plugin','datatable-base','stylesheet']});
 
 
-YUI.add('datatable', function(Y){}, '@VERSION@' ,{use:['datatable-base','datatable-sort','datatable-scroll']});
+YUI.add('datatable', function(Y){}, '@VERSION@' ,{use:['datatable-base','datatable-datasource','datatable-sort','datatable-scroll']});
 

@@ -159,21 +159,22 @@ YUI.add('editor-base', function(Y) {
             
             switch (e.changedType) {
                 case 'keydown':
-                    //inst.later(100, inst, inst.Selection.cleanCursor);
-                    inst.Selection.cleanCursor();
+                    if (!Y.UA.gecko) {
+                        if (!EditorBase.NC_KEYS[e.changedEvent.keyCode] && !e.changedEvent.shiftKey && !e.changedEvent.ctrlKey && (e.changedEvent.keyCode !== 13)) {
+                            //inst.later(100, inst, inst.Selection.cleanCursor);
+                        }
+                    }
                     break;
                 case 'tab':
                     if (!e.changedNode.test('li, li *') && !e.changedEvent.shiftKey) {
                         e.changedEvent.frameEvent.preventDefault();
                         if (Y.UA.webkit) {
                             this.execCommand('inserttext', '\t');
-                        } else {
+                        } else if (Y.UA.gecko) {
+                            this.frame.exec._command('inserthtml', '<span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>');
+                        } else if (Y.UA.ie) {
                             sel = new inst.Selection();
-                            sel.setCursor();
-                            cur = sel.getCursor();
-                            cur.insert(EditorBase.TABKEY, 'before');
-                            sel.focusCursor();
-                            inst.Selection.cleanCursor();
+                            sel._selection.pasteHTML(EditorBase.TABKEY);
                         }
                     }
                     break;
@@ -208,9 +209,13 @@ YUI.add('editor-base', function(Y) {
 
                 //Bold and Italic styles
                 var s = el.currentStyle || el.style;
-
                 if ((''+s.fontWeight) == 'bold') { //Cast this to a string
                     cmds.bold = 1;
+                }
+                if (Y.UA.ie) {
+                    if (s.fontWeight > 400) {
+                        cmds.bold = 1;
+                    }
                 }
                 if (s.fontStyle == 'italic') {
                     cmds.italic = 1;
@@ -360,15 +365,26 @@ YUI.add('editor-base', function(Y) {
 
             if (Y.UA.ie) {
                 this.frame.on('dom:activate', Y.bind(this._onFrameActivate, this));
-                this.frame.on('dom:keyup', Y.throttle(Y.bind(this._onFrameKeyUp, this), 800));
-                this.frame.on('dom:keypress', Y.throttle(Y.bind(this._onFrameKeyPress, this), 800));
-            } else {
-                this.frame.on('dom:keyup', Y.bind(this._onFrameKeyUp, this));
-                this.frame.on('dom:keypress', Y.bind(this._onFrameKeyPress, this));
+                this.frame.on('dom:beforedeactivate', Y.bind(this._beforeFrameDeactivate, this));
             }
+            this.frame.on('dom:keyup', Y.bind(this._onFrameKeyUp, this));
+            this.frame.on('dom:keypress', Y.bind(this._onFrameKeyPress, this));
 
             inst.Selection.filter();
             this.fire('ready');
+        },
+        /**
+        * Caches the current cursor position in IE.
+        * @method _beforeFrameDeactivate
+        * @private
+        */
+        _beforeFrameDeactivate: function() {
+            var inst = this.getInstance(),
+                sel = inst.config.doc.selection.createRange();
+            
+            if ((!sel.compareEndPoints('StartToEnd', sel))) {
+                sel.pasteHTML('<var id="yui-ie-cursor">');
+            }
         },
         /**
         * Moves the cached selection bookmark back so IE can place the cursor in the right place.
@@ -376,16 +392,21 @@ YUI.add('editor-base', function(Y) {
         * @private
         */
         _onFrameActivate: function() {
-            if (this._lastBookmark) {
-                try {
-                    var inst = this.getInstance(),
-                        sel = inst.config.doc.selection.createRange(),
-                        bk = sel.moveToBookmark(this._lastBookmark);
+            var inst = this.getInstance(),
+                sel = new inst.Selection(),
+                range = sel.createRange(),
+                cur = inst.all('#yui-ie-cursor');
 
-                    sel.select();
-                    this._lastBookmark = null;
-                } catch (e) {
-                }
+            if (cur.size()) {
+                cur.each(function(n) {
+                    n.set('id', '');
+                    range.moveToElementText(n._node);
+                    range.move('character', -1);
+                    range.move('character', 1);
+                    range.select();
+                    range.text = '';
+                    n.remove();
+                });
             }
         },
         /**
@@ -733,13 +754,18 @@ YUI.add('editor-base', function(Y) {
             * @attribute content
             */
             content: {
-                value: '<br>',
+                value: '<br class="yui-cursor">',
                 setter: function(str) {
                     if (str.substr(0, 1) === "\n") {
                         str = str.substr(1);
                     }
                     if (str === '') {
-                        str = '<br>';
+                        str = '<br class="yui-cursor">';
+                    }
+                    if (str === ' ') {
+                        if (Y.UA.gecko) {
+                            str = '<br class="yui-cursor">';
+                        }
                     }
                     return this.frame.set('content', str);
                 },

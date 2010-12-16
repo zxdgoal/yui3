@@ -1015,8 +1015,9 @@ Y.CustomEvent.prototype = {
         }
 
         if (s) {
-            delete s.fn;
-            delete s.context;
+            // delete s.fn;
+            // delete s.context;
+            s.deleted = true;
         }
     }
 };
@@ -1081,6 +1082,15 @@ Y.Subscriber = function(fn, context, args) {
 Y.Subscriber.prototype = {
 
     _notify: function(c, args, ce) {
+        if (this.deleted && !this.postponed) {
+            if (this.postponed) {
+                delete this.fn;
+                delete this.context;
+            } else {
+                delete this.postponed;
+                return null;
+            }
+        }
         var a = this.args, ret;
         switch (ce.signature) {
             case 0:
@@ -1300,6 +1310,26 @@ ET.prototype = {
             }
         });
         return handle;
+    },
+
+    /**
+     * Takes the type parameter passed to 'on' and parses out the
+     * various pieces that could be included in the type.  If the
+     * event type is passed without a prefix, it will be expanded
+     * to include the prefix one is supplied or the event target
+     * is configured with a default prefix.
+     * @method parseType
+     * @param {string} type the type
+     * @param {string} [pre=this._yuievt.config.prefix] the prefix
+     * @since 3.3.0
+     * @return {Array} an array containing:
+     *  * the detach category, if supplied,
+     *  * the prefixed event type,
+     *  * whether or not this is an after listener,
+     *  * the supplied event type
+     */
+    parseType: function(type, pre) {
+        return _parseType(type, pre || this._yuievt.config.prefix);
     },
 
     /**

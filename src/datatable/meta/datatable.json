@@ -5,18 +5,24 @@
                 "requires": [
                     "recordset-base",
                     "widget",
-                    "intl",
                     "substitute",
                     "event-mouseenter"
                 ],
                 "skinnable": true
+            },
+            "datatable-datasource": {
+                "requires": [
+                    "datatable-base",
+                    "datasource-local"
+                ]
             },
             "datatable-sort": {
                 "requires": [
                     "datatable-base",
                     "plugin",
                     "recordset-sort"
-                ]
+                ],
+                "lang": ["en"]
             },
 			"datatable-scroll": {
 				"requires": [

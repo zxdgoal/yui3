@@ -56,7 +56,11 @@ SUBREGEX = /\{\s*([^\|\}]+?)\s*(?:\|([^\}]*))?\s*\}/g;
  * @param o The object to test.
  * @return {boolean} true if o is an array.
  */
-L.isArray = Array.isArray || function(o) {
+// L.isArray = Array.isArray || function(o) {
+//     return L.type(o) === ARRAY;
+// };
+
+L.isArray = function(o) {
     return L.type(o) === ARRAY;
 };
 
@@ -199,7 +203,7 @@ L.trim = STRING_PROTO.trim ? function(s) {
 L.trimLeft = STRING_PROTO.trimLeft ? function (s) {
     return s.trimLeft();
 } : function (s) {
-    return s.replace(/^s+/, '');
+    return s.replace(/^\s+/, '');
 };
 
 /**
@@ -212,7 +216,7 @@ L.trimLeft = STRING_PROTO.trimLeft ? function (s) {
 L.trimRight = STRING_PROTO.trimRight ? function (s) {
     return s.trimRight();
 } : function (s) {
-    return s.replace(/s+$/, '');
+    return s.replace(/\s+$/, '');
 };
 
 /**

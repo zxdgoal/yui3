@@ -16,7 +16,7 @@
 <div id="doc3" class="yui-t2">
 	<div id="hd">
         <h1><a href="http://developer.yahoo.com/yui/" title="Yahoo! UI Library">Yahoo! UI Library</a></h1>
-        <h3>plugin&nbsp; <span class="subtitle">3.3.0int1</span></h3>
+        <h3>plugin&nbsp; <span class="subtitle">3.3.0</span></h3>
         <a href="./index.html" title="Yahoo! UI Library">Yahoo! UI Library</a> 
             &gt; <a href="./module_plugin.html" title="plugin">plugin</a>
                  &gt; Plugin.Base 
@@ -59,6 +59,12 @@
                         <dl class="subclasses" rel="yui:subclasses">
                             <dt>Known Subclasses:</dt>
                             <dd>
+                                    <span rel="yui:subclass" resource="DataTableSort.html">
+                                    <a href="DataTableSort.html" property="yui:name" title="DataTableSort">DataTableSort</a>
+                                    </span>
+                                    <span rel="yui:subclass" resource="DataTableDataSource.html">
+                                    <a href="DataTableDataSource.html" property="yui:name" title="DataTableDataSource">DataTableDataSource</a>
+                                    </span>
                                     <span rel="yui:subclass" resource="DataSourceXMLSchema.html">
                                     <a href="DataSourceXMLSchema.html" property="yui:name" title="DataSourceXMLSchema">DataSourceXMLSchema</a>
                                     </span>
@@ -70,6 +76,9 @@
                                     </span>
                                     <span rel="yui:subclass" resource="Plugin.WidgetAnim.html">
                                     <a href="Plugin.WidgetAnim.html" property="yui:name" title="Plugin.WidgetAnim">Plugin.WidgetAnim</a>
+                                    </span>
+                                    <span rel="yui:subclass" resource="DataTableScroll.html">
+                                    <a href="DataTableScroll.html" property="yui:name" title="DataTableScroll">DataTableScroll</a>
                                     </span>
                                     <span rel="yui:subclass" resource="Plugin.ScrollViewPaginator.html">
                                     <a href="Plugin.ScrollViewPaginator.html" property="yui:name" title="Plugin.ScrollViewPaginator">Plugin.ScrollViewPaginator</a>
@@ -758,6 +767,9 @@ Listeners attached through this method will be detached when the plugin is unplu
                                             <span rel="yui:method" resource="EventTarget.html#method_once">                                        
                                             <a class="" href="EventTarget.html#method_once" property="yui:name" title="once">once</a><span class="">,</span>
                                             </span>
+                                            <span rel="yui:method" resource="EventTarget.html#method_parseType">                                        
+                                            <a class="" href="EventTarget.html#method_parseType" property="yui:name" title="parseType">parseType</a><span class="">,</span>
+                                            </span>
                                             <span rel="yui:method" resource="EventTarget.html#method_publish">                                        
                                             <a class="" href="EventTarget.html#method_publish" property="yui:name" title="publish">publish</a><span class="">,</span>
                                             </span>
@@ -1073,8 +1085,10 @@ Listeners attached through this method will be detached when the plugin is unplu
                                 <li class=""><a href="module_cookie.html" title="cookie">cookie</a></li>
                                 <li class=""><a href="module_dataschema.html" title="dataschema">dataschema</a></li>
                                 <li class=""><a href="module_datasource.html" title="datasource">datasource</a></li>
+                                <li class=""><a href="module_datatable.html" title="datatable">datatable</a></li>
                                 <li class=""><a href="module_datatype.html" title="datatype">datatype</a></li>
                                 <li class=""><a href="module_dd.html" title="dd">dd</a></li>
+                                <li class=""><a href="module_dial.html" title="dial">dial</a></li>
                                 <li class=""><a href="module_dom.html" title="dom">dom</a></li>
                                 <li class=""><a href="module_dump.html" title="dump">dump</a></li>
                                 <li class=""><a href="module_editor.html" title="editor">editor</a></li>
@@ -1098,7 +1112,6 @@ Listeners attached through this method will be detached when the plugin is unplu
                                 <li class=""><a href="module_node-flick.html" title="node-flick">node-flick</a></li>
                                 <li class=""><a href="module_node-focusmanager.html" title="node-focusmanager">node-focusmanager</a></li>
                                 <li class=""><a href="module_node-menunav.html" title="node-menunav">node-menunav</a></li>
-                                <li class=""><a href="module_node-tokeninput.html" title="node-tokeninput">node-tokeninput</a></li>
                                 <li class=""><a href="module_oop.html" title="oop">oop</a></li>
                                 <li class=""><a href="module_overlay.html" title="overlay">overlay</a></li>
                                 <li class="selected"><a href="module_plugin.html" title="plugin">plugin</a></li>
@@ -1107,9 +1120,11 @@ Listeners attached through this method will be detached when the plugin is unplu
                                 <li class=""><a href="module_profiler.html" title="profiler">profiler</a></li>
                                 <li class=""><a href="module_querystring.html" title="querystring">querystring</a></li>
                                 <li class=""><a href="module_queue-promote.html" title="queue-promote">queue-promote</a></li>
+                                <li class=""><a href="module_recordset.html" title="recordset">recordset</a></li>
                                 <li class=""><a href="module_resize.html" title="resize">resize</a></li>
                                 <li class=""><a href="module_scrollview.html" title="scrollview">scrollview</a></li>
                                 <li class=""><a href="module_scrollview-base.html" title="scrollview-base">scrollview-base</a></li>
+                                <li class=""><a href="module_scrollview-base-ie.html" title="scrollview-base-ie">scrollview-base-ie</a></li>
                                 <li class=""><a href="module_scrollview-paginator.html" title="scrollview-paginator">scrollview-paginator</a></li>
                                 <li class=""><a href="module_scrollview-scrollbars.html" title="scrollview-scrollbars">scrollview-scrollbars</a></li>
                                 <li class=""><a href="module_shim-plugin.html" title="shim-plugin">shim-plugin</a></li>
@@ -1121,11 +1136,12 @@ Listeners attached through this method will be detached when the plugin is unplu
                                 <li class=""><a href="module_swfdetect.html" title="swfdetect">swfdetect</a></li>
                                 <li class=""><a href="module_tabview.html" title="tabview">tabview</a></li>
                                 <li class=""><a href="module_test.html" title="test">test</a></li>
+                                <li class=""><a href="module_text.html" title="text">text</a></li>
                                 <li class=""><a href="module_transition.html" title="transition">transition</a></li>
-                                <li class=""><a href="module_unicode.html" title="unicode">unicode</a></li>
                                 <li class=""><a href="module_uploader.html" title="uploader">uploader</a></li>
                                 <li class=""><a href="module_widget.html" title="widget">widget</a></li>
                                 <li class=""><a href="module_widget-anim.html" title="widget-anim">widget-anim</a></li>
+                                <li class=""><a href="module_widget-base-ie.html" title="widget-base-ie">widget-base-ie</a></li>
                                 <li class=""><a href="module_widget-child.html" title="widget-child">widget-child</a></li>
                                 <li class=""><a href="module_widget-locale.html" title="widget-locale">widget-locale</a></li>
                                 <li class=""><a href="module_widget-parent.html" title="widget-parent">widget-parent</a></li>

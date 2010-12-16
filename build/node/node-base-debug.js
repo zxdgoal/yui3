@@ -139,6 +139,7 @@ Y_Node.DOM_EVENTS = {
     mouseover: 1,
     mouseup: 1,
     mousewheel: 1,
+    orientationchange: 1,
     reset: 1,
     resize: 1,
     select: 1,
@@ -315,15 +316,18 @@ Y_Node.one = function(node) {
 };
 
 /**
- * Creates a new dom node using the provided markup string.
+ * Returns a new dom node using the provided markup string.
  * @method create
  * @static
  * @param {String} html The markup used to create the element
  * @param {HTMLDocument} doc An optional document context
  * @return {Node} A Node instance bound to a DOM node or fragment
  */
-Y_Node.create = function() {
-    return Y.one(Y_DOM.create.apply(Y_DOM, arguments));
+Y_Node.create = function(html, doc) {
+    if (doc && doc._node) {
+        doc = doc._node;
+    }
+    return Y.one(Y_DOM.create(html, doc));
 };
 
 /**
@@ -540,7 +544,7 @@ Y.mix(Y_Node.prototype, {
             this._setAttr.apply(this, arguments);
         } else { // use setters inline
             if (attrConfig && attrConfig.setter) {
-                attrConfig.setter.call(this, val);
+                attrConfig.setter.call(this, val, attr);
             } else if (Y_Node.re_aria.test(attr)) { // special case Aria
                 this._node.setAttribute(attr, val);
             } else {
@@ -740,6 +744,8 @@ Y.mix(Y_Node.prototype, {
      * Removes the node from its parent.
      * Shortcut for myNode.get('parentNode').removeChild(myNode);
      * @method remove
+     * @param {Boolean} destroy whether or not to call destroy() on the node
+     * after removal.
      * @chainable
      *
      */
@@ -752,7 +758,7 @@ Y.mix(Y_Node.prototype, {
         }
 
         if (destroy) {
-            this.destroy(true);
+            this.destroy();
         }
 
         return this;
@@ -807,7 +813,7 @@ Y.mix(Y_Node.prototype, {
      * @return {Node} The inserted node 
      */
     insertBefore: function(newNode, refNode) {
-        return Y.Node.scrubVal(this._insert(newNode, refNode, 'before'));
+        return Y.Node.scrubVal(this._insert(newNode, refNode));
     },
 
     /**
@@ -831,18 +837,23 @@ Y.mix(Y_Node.prototype, {
      * node's subtree (default is false)
      *
      */
-    destroy: function(recursivePurge) {
-        delete Y_Node._instances[this[UID]];
-        this.purge(recursivePurge);
+    destroy: function(recursive) {
+        this.purge(); // TODO: only remove events add via this Node
 
         if (this.unplug) { // may not be a PluginHost
             this.unplug();
         }
 
-        this._node._yuid = null;
+        this.clearData();
+
+        if (recursive) {
+            this.all('*').destroy();
+        }
+
         this._node = null;
         this._stateProxy = null;
-        this.clearData();
+
+        delete Y_Node._instances[this[UID]];
     },
 
     /**
@@ -1080,8 +1091,9 @@ Y.mix(Y_Node.prototype, {
      * @param {Function} callback An optional function to run after the transition completes. 
      * @chainable
      */
-    show: function(name, config, callback) {
-        this._show();
+    show: function(callback) {
+        callback = arguments[arguments.length - 1];
+        this.toggleView(true, callback);
         return this;
     },
 
@@ -1093,6 +1105,36 @@ Y.mix(Y_Node.prototype, {
      */
     _show: function() {
         this.setStyle('display', '');
+
+    },
+
+    _isHidden: function() {
+        return Y.DOM.getStyle(this._node, 'display') === 'none';
+    },
+
+    toggleView: function(on, callback) {
+        this._toggleView.apply(this, arguments);
+    },
+
+    _toggleView: function(on, callback) {
+        callback = arguments[arguments.length - 1];
+
+        // base on current state if not forcing 
+        if (typeof on != 'boolean') {
+            on = (this._isHidden()) ? 1 : 0;
+        }
+
+        if (on) {
+            this._show();
+        }  else {
+            this._hide();
+        }
+
+        if (typeof callback == 'function') {
+            callback.call(this);
+        }
+
+        return this;
     },
 
     /**
@@ -1106,8 +1148,9 @@ Y.mix(Y_Node.prototype, {
      * @param {Function} callback An optional function to run after the transition completes. 
      * @chainable
      */
-    hide: function(name, config, callback) {
-        this._hide();
+    hide: function(callback) {
+        callback = arguments[arguments.length - 1];
+        this.toggleView(false, callback);
         return this;
     },
 
@@ -1442,6 +1485,9 @@ Y.mix(NodeList.prototype, {
      * @param {Function} fn The handler to call when the event fires
      * @param {Object} context The context to call the handler with.
      * Default is the NodeList instance.
+     * @param {Object} context The context to call the handler with.
+     * param {mixed} arg* 0..n additional arguments to supply to the subscriber
+     * when the event fires.
      * @return {Object} Returns an event handle that can later be use to detach().
      * @see Event.on
      */
@@ -1585,7 +1631,35 @@ NodeList.importMethod(Y.Node.prototype, [
       * @method setContent
       * @see Node.setContent
       */
-    'setContent'
+    'setContent',
+
+    /**
+     * Makes each node visible.
+     * If the "transition" module is loaded, show optionally
+     * animates the showing of the node using either the default
+     * transition effect ('fadeIn'), or the given named effect.
+     * @method show
+     * @param {String} name A named Transition effect to use as the show effect. 
+     * @param {Object} config Options to use with the transition. 
+     * @param {Function} callback An optional function to run after the transition completes. 
+     * @chainable
+     */
+    'show',
+
+    /**
+     * Hides each node.
+     * If the "transition" module is loaded, hide optionally
+     * animates the hiding of the node using either the default
+     * transition effect ('fadeOut'), or the given named effect.
+     * @method hide
+     * @param {String} name A named Transition effect to use as the show effect. 
+     * @param {Object} config Options to use with the transition. 
+     * @param {Function} callback An optional function to run after the transition completes. 
+     * @chainable
+     */
+    'hide',
+
+    'toggleView'
 ]);
 
 // one-off implementation to convert array of Nodes to NodeList
@@ -1739,8 +1813,8 @@ Y.Array.each([
     'createCaption'
 
 ], function(method) {
-    Y.Node.prototype[method] = function(arg1, arg2, arg3) {
     Y.log('adding: ' + method, 'info', 'node');
+    Y.Node.prototype[method] = function(arg1, arg2, arg3) {
         var ret = this.invoke(method, arg1, arg2, arg3);
         return ret;
     };
@@ -1789,7 +1863,14 @@ Y.Node.importMethod(Y.DOM, [
      * @method unwrap
      * @chainable
      */
-    'unwrap'
+    'unwrap',
+
+    /**
+     * Applies a unique ID to the node if none exists
+     * @method generateID
+     * @return {String} The existing or generated ID
+     */
+    'generateID'
 ]);
 
 Y.NodeList.importMethod(Y.Node.prototype, [
@@ -1837,7 +1918,14 @@ Y.NodeList.importMethod(Y.Node.prototype, [
  * @param {String} html The markup to wrap around the node. 
  * @chainable
  */
-    'wrap'
+    'wrap',
+
+/**
+ * Applies a unique ID to each node if none exists
+ * @method generateID
+ * @return {String} The existing or generated ID
+ */
+    'generateID'
 ]);
 (function(Y) {
     var methods = [
@@ -1846,7 +1934,7 @@ Y.NodeList.importMethod(Y.Node.prototype, [
      * @method hasClass
      * @for Node
      * @param {String} className the class name to search for
-     * @return {Array} An array of booleans for each node bound to the NodeList. 
+     * @return {Boolean} Whether or not the element has the specified class 
      */
      'hasClass',
 
@@ -1880,6 +1968,7 @@ Y.NodeList.importMethod(Y.Node.prototype, [
      * If the className exists on the node it is removed, if it doesn't exist it is added.
      * @method toggleClass  
      * @param {String} className the class name to be toggled
+     * @param {Boolean} force Option to force adding or removing the class. 
      * @chainable
      */
      'toggleClass'

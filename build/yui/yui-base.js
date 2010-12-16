@@ -528,7 +528,6 @@ proto = {
                         }
                     }
 
-
                     if (use) {
                         for (j = 0; j < use.length; j++) {
                             if (!done[use[j]]) {
@@ -1573,7 +1572,11 @@ SUBREGEX = /\{\s*([^\|\}]+?)\s*(?:\|([^\}]*))?\s*\}/g;
  * @param o The object to test.
  * @return {boolean} true if o is an array.
  */
-L.isArray = Array.isArray || function(o) {
+// L.isArray = Array.isArray || function(o) {
+//     return L.type(o) === ARRAY;
+// };
+
+L.isArray = function(o) {
     return L.type(o) === ARRAY;
 };
 
@@ -1716,7 +1719,7 @@ L.trim = STRING_PROTO.trim ? function(s) {
 L.trimLeft = STRING_PROTO.trimLeft ? function (s) {
     return s.trimLeft();
 } : function (s) {
-    return s.replace(/^s+/, '');
+    return s.replace(/^\s+/, '');
 };
 
 /**
@@ -1729,7 +1732,7 @@ L.trimLeft = STRING_PROTO.trimLeft ? function (s) {
 L.trimRight = STRING_PROTO.trimRight ? function (s) {
     return s.trimRight();
 } : function (s) {
-    return s.replace(/s+$/, '');
+    return s.replace(/\s+$/, '');
 };
 
 /**
@@ -2078,9 +2081,7 @@ Queue.prototype = {
      * @return {object} this queue.
      */
     add: function() {
-        Y.Array.each(Y.Array(arguments, 0, true), function(fn) {
-            this._q.push(fn);
-        }, this);
+        this._q.push.apply(this._q, arguments);
 
         return this;
     },
@@ -2099,6 +2100,7 @@ Queue.prototype = {
 Y.Queue = Queue;
 
 YUI.Env._loaderQueue = YUI.Env._loaderQueue || new Queue();
+
 /**
  * The YUI module contains the components required for building the YUI
  * seed file.  This includes the script loading mechanism, a simple queue,
@@ -2290,11 +2292,15 @@ Y.cached = function(source, cache, refetch) {
  */
 var F = function() {},
 
-O = Object.create || function(o) {
+// O = Object.create || function(o) {
+//     F.prototype = o;
+//     return new F();
+// },
+
+O = function(o) {
     F.prototype = o;
     return new F();
 },
-
 
 owns = function(o, k) {
     return o && o.hasOwnProperty && o.hasOwnProperty(k);
@@ -2338,7 +2344,11 @@ Y.Object = O;
  * @param o an object.
  * @return {string[]} the keys.
  */
-O.keys = Object.keys || function(o) {
+// O.keys = Object.keys || function(o) {
+//     return _extract(o);
+// };
+
+O.keys = function(o) {
     return _extract(o);
 };
 
@@ -2349,7 +2359,11 @@ O.keys = Object.keys || function(o) {
  * @param o an object.
  * @return {Array} the values.
  */
-O.values = Object.values || function(o) {
+// O.values = Object.values || function(o) {
+//     return _extract(o, 1);
+// };
+
+O.values = function(o) {
     return _extract(o, 1);
 };
 

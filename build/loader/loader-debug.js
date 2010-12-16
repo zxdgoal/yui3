@@ -13,7 +13,7 @@ if (!YUI.Env[Y.version]) {
             BUILD = '/build/',
             ROOT = VERSION + BUILD,
             CDN_BASE = Y.Env.base,
-            GALLERY_VERSION = 'gallery-2010.10.20-19-33',
+            GALLERY_VERSION = 'gallery-2010.12.10-17-31',
             TNT = '2in3',
             TNT_VERSION = '4',
             YUI2_VERSION = '2.8.2',
@@ -100,7 +100,6 @@ if (!YUI.Env[Y.version]) {
  * @module loader
  * @submodule loader-base
  */
-
 
 var NOT_FOUND = {},
     NO_REQUIREMENTS = [],
@@ -900,7 +899,7 @@ Y.Loader.prototype = {
             oeach(mods, function(v, k) {
                 v.group = name;
                 self.addModule(v, k);
-            }, self);
+            });
         }
     },
 
@@ -1063,6 +1062,24 @@ Y.Loader.prototype = {
 
 // Y.log('pack ' + packName + ' should supersede ' + supName);
 // Add rollup file, need to add to supersedes list too
+
+                            // default packages
+                            packName = this.getLangPackName(ROOT_LANG, name);
+                            supName = this.getLangPackName(ROOT_LANG, i);
+
+                            smod = this.moduleInfo[packName];
+
+                            if (!smod) {
+                                smod = this._addLangPack(lang, o, packName);
+                            }
+
+                            if (!(supName in flatSup)) {
+                                smod.supersedes.push(supName);
+                            }
+
+// Y.log('pack ' + packName + ' should supersede ' + supName);
+// Add rollup file, need to add to supersedes list too
+
                         }
                     }
 
@@ -1082,7 +1099,6 @@ Y.Loader.prototype = {
                     plug.path = plug.path || _path(name, i, o.type);
                     plug.requires = plug.requires || [];
                     plug.group = o.group;
-                    // plug.requires.push(name);
                     this.addModule(plug, i);
                     if (o.skinnable) {
                         this._addSkin(this.skin.defaultSkin, i, name);
@@ -1107,12 +1123,6 @@ Y.Loader.prototype = {
                     // the trigger requires the conditional mod,
                     // so it should appear before the conditional
                     // mod if we do not intersede.
-                    //
-                    // triggermod = this.getModule(trigger);
-                    // if (triggermod) {
-                    //     triggermod.after = triggermod.after || [];
-                    //     triggermod.after.push(name);
-                    // }
                 }
             } else { // after the trigger
                 o.after = o.after || [];
@@ -1157,10 +1167,6 @@ Y.Loader.prototype = {
      */
     getRequires: function(mod) {
 
-        // if (mod.name == 'node-base') {
-            // eval('debugger;');
-        // }
-
         if (!mod || mod._parsed) {
             // Y.log('returning no reqs for ' + mod.name);
             return NO_REQUIREMENTS;
@@ -1185,7 +1191,8 @@ Y.Loader.prototype = {
             delete mod.expanded;
         }
 
-        if (mod.expanded && (!mod.langCache || mod.langCache == this.lang)) {
+        // if (mod.expanded && (!mod.langCache || mod.langCache == this.lang)) {
+        if (mod.expanded && (!this.lang || mod.langCache === this.lang)) {
             // Y.log('already expanded ' + name + ', ' + mod.expanded);
             return mod.expanded;
         }
@@ -1224,7 +1231,6 @@ Y.Loader.prototype = {
         if (r) {
             for (i = 0; i < r.length; i++) {
                 if (!hash[r[i]]) {
-
                     // if this module has submodules, the requirements list is
                     // expanded to include the submodules.  This is so we can
                     // prevent dups when a submodule is already loaded and the
@@ -1362,28 +1368,6 @@ Y.Loader.prototype = {
         return m.provides;
     },
 
-    // checkConditions: function() {
-    //     var self = this,
-    //         conds = self.conditions;
-
-    //     Y.Object.each(self.required, function(mod, name) {
-
-    //         var cond = conds[name];
-
-    //         Y.Object.each(cond, function(def, condmod) {
-    //             if (def) {
-    //                 var go = def.result || ((def.ua && Y.UA[def.ua]) ||
-    //                              (def.test && def.test(Y)));
-    //                 def.result = go;
-    //                 if (go) {
-    //                     self.required[condmod] = true;
-    //                 }
-    //             }
-    //         });
-
-    //     });
-    // },
-
     /**
      * Calculates the dependency tree, the result is stored in the sorted
      * property.
@@ -1402,10 +1386,7 @@ Y.Loader.prototype = {
                 this._setup();
             }
 
-
             this._explode();
-
-            // this.checkConditions();
 
             if (this.allowRollup) {
                 this._rollup();
@@ -1547,29 +1528,6 @@ Y.Loader.prototype = {
 
                     reqs = self.getRequires(m);
                     Y.mix(r, YArray.hash(reqs));
-
-                    // sups = m.supersedes;
-
-                    // if (sups) {
-                    //     YArray.each(sups, function(sup) {
-                    //         if (sup in self.loaded) {
-                    //             delete r[name];
-                    //         }
-                    //         // if (sup in self.conditions) {
-                    //         r[sup] = true;
-                    //         //}
-                    //     });
-                    // }
-
-                    // remove the definition for a rollup with
-                    // submodules -- getRequires() includes the
-                    // submodules.  Removing the parent makes
-                    // it possible to prevent submodule duplication
-                    // if the parent is requested after a submodule
-                    // has been loaded.
-                    // if (m.submodules) {
-                    //     delete r[name];
-                    // }
                 }
             }
         });
@@ -1680,31 +1638,35 @@ Y.log('Undefined module: ' + mname + ', matched a pattern: ' +
     },
 
     _onSuccess: function() {
-        // Y.log('loader _onSuccess, skipping: ' +
-        // Y.Object.keys(this.skipped), "info", "loader");
-        var skipped = Y.merge(this.skipped), fn;
+        var self = this, skipped = Y.merge(self.skipped), fn,
+            failed = [], rreg = self.requireRegistration;
 
         oeach(skipped, function(k) {
-            delete this.inserted[k];
-        }, this);
+            delete self.inserted[k];
+        });
 
-        this.skipped = {};
+        self.skipped = {};
 
-        // Y.mix(this.loaded, this.inserted);
-        oeach(this.inserted, function(v, k) {
-            Y.mix(this.loaded, this.getProvides(k));
-        }, this);
+        oeach(self.inserted, function(v, k) {
+            mod = self.getModule(k);
+            if (rreg && k.type == JS && !(k in YUI.Env.mods)) {
+                failed.push(k);
+            } else {
+                Y.mix(self.loaded, self.getProvides(k));
+            }
+        });
 
-        fn = this.onSuccess;
+        fn = self.onSuccess;
         if (fn) {
-            fn.call(this.context, {
-                msg: 'success',
-                data: this.data,
-                success: true,
+            fn.call(self.context, {
+                msg: (failed.length) ? 'success' : 'notregistered',
+                data: self.data,
+                success: !!(failed.length),
+                failed: failed,
                 skipped: skipped
             });
         }
-        this._finish('success', true);
+        self._finish('success', true);
     },
 
     _onFailure: function(o) {
@@ -1733,14 +1695,12 @@ Y.log('Undefined module: ' + mname + ', matched a pattern: ' +
         this._finish('timeout', false);
     },
 
-
     /**
      * Sorts the dependency tree.  The last step of calculate()
      * @method _sort
      * @private
      */
     _sort: function() {
-
 
         // create an indexed list
         var s = YObject.keys(this.required),
@@ -1807,46 +1767,6 @@ Y.log('Undefined module: ' + mname + ', matched a pattern: ' +
         this.sorted = s;
 
     },
-
-    // _get: function(js, css) {
-
-
-
-    // }
-
-    // _combo: function(js, css) {
-
-    // }
-
-    // _insert: function(source, o, type) {
-    //     if (source) {
-    //         this._config(source);
-    //     }
-
-    //     var js = [],
-    //         css = [],
-    //         mod,
-    //         sorted = this.sorted,
-    //         i = 0,
-    //         l = sorted.length,
-    //         combine = this.combine;
-
-    //     for (; i < l; i++) {
-    //         mod = this.getModule(sorted[i]);
-    //         if (mod.type = CSS && type != JS) {
-    //             css.push(mod);
-    //         } else if (type != CSS) {
-    //             js.push(mod);
-    //         }
-    //     }
-
-    //     if (this.combine) {
-    //         this._combo(js, css);
-    //     } else {
-    //         this._get(js, css);
-    //     }
-
-    // },
 
     partial: function(partial, o, type) {
         this.sorted = partial;
@@ -1968,33 +1888,32 @@ Y.log('Undefined module: ' + mname + ', matched a pattern: ' +
 
         var s, len, i, m, url, fn, msg, attr, group, groupName, j, frag,
             comboSource, comboSources, mods, combining, urls, comboBase,
-            // provided,
             self = this,
-            type = this.loadType,
+            type = self.loadType,
             handleSuccess = function(o) {
-                                self.loadNext(o.data);
-                            },
+                self.loadNext(o.data);
+            },
             handleCombo = function(o) {
-                                self._combineComplete[type] = true;
-                                var i, len = combining.length;
+                self._combineComplete[type] = true;
+                var i, len = combining.length;
 
-                                for (i = 0; i < len; i++) {
-                                    self.inserted[combining[i]] = true;
-                                }
+                for (i = 0; i < len; i++) {
+                    self.inserted[combining[i]] = true;
+                }
 
-                                handleSuccess(o);
-                            };
+                handleSuccess(o);
+            };
 
-        if (this.combine && (!this._combineComplete[type])) {
+        if (self.combine && (!self._combineComplete[type])) {
 
             combining = [];
 
-            this._combining = combining;
-            s = this.sorted;
+            self._combining = combining;
+            s = self.sorted;
             len = s.length;
 
             // the default combo base
-            comboBase = this.comboBase;
+            comboBase = self.comboBase;
 
             url = comboBase;
             urls = [];
@@ -2003,11 +1922,11 @@ Y.log('Undefined module: ' + mname + ', matched a pattern: ' +
 
             for (i = 0; i < len; i++) {
                 comboSource = comboBase;
-                m = this.getModule(s[i]);
+                m = self.getModule(s[i]);
                 groupName = m && m.group;
                 if (groupName) {
 
-                    group = this.groups[groupName];
+                    group = self.groups[groupName];
 
                     if (!group.combine) {
                         m.combine = false;
@@ -2035,18 +1954,18 @@ Y.log('Undefined module: ' + mname + ', matched a pattern: ' +
                     len = mods.length;
 
                     for (i = 0; i < len; i++) {
-                        // m = this.getModule(s[i]);
+                        // m = self.getModule(s[i]);
                         m = mods[i];
 
                         // Do not try to combine non-yui JS unless combo def
                         // is found
                         if (m && (m.type === type) && (m.combine || !m.ext)) {
 
-                            frag = (m.root || this.root) + m.path;
+                            frag = (m.root || self.root) + m.path;
 
                             if ((url !== j) && (i < (len - 1)) &&
-                            ((frag.length + url.length) > this.maxURLLength)) {
-                                urls.push(this._filter(url));
+                            ((frag.length + url.length) > self.maxURLLength)) {
+                                urls.push(self._filter(url));
                                 url = j;
                             }
 
@@ -2061,7 +1980,7 @@ Y.log('Undefined module: ' + mname + ', matched a pattern: ' +
                     }
 
                     if (combining.length && (url != j)) {
-                        urls.push(this._filter(url));
+                        urls.push(self._filter(url));
                     }
                 }
             }
@@ -2073,29 +1992,29 @@ Y.log('Attempting to use combo: ' + combining, 'info', 'loader');
                 // if (m.type === CSS) {
                 if (type === CSS) {
                     fn = Y.Get.css;
-                    attr = this.cssAttributes;
+                    attr = self.cssAttributes;
                 } else {
                     fn = Y.Get.script;
-                    attr = this.jsAttributes;
+                    attr = self.jsAttributes;
                 }
 
                 fn(urls, {
-                    data: this._loading,
+                    data: self._loading,
                     onSuccess: handleCombo,
-                    onFailure: this._onFailure,
-                    onTimeout: this._onTimeout,
-                    insertBefore: this.insertBefore,
-                    charset: this.charset,
+                    onFailure: self._onFailure,
+                    onTimeout: self._onTimeout,
+                    insertBefore: self.insertBefore,
+                    charset: self.charset,
                     attributes: attr,
-                    timeout: this.timeout,
+                    timeout: self.timeout,
                     autopurge: false,
-                    context: this
+                    context: self
                 });
 
                 return;
 
             } else {
-                this._combineComplete[type] = true;
+                self._combineComplete[type] = true;
             }
         }
 
@@ -2103,7 +2022,7 @@ Y.log('Attempting to use combo: ' + combining, 'info', 'loader');
 
             // if the module that was just loaded isn't what we were expecting,
             // continue to wait
-            if (mname !== this._loading) {
+            if (mname !== self._loading) {
                 return;
             }
 
@@ -2114,28 +2033,28 @@ Y.log('Attempting to use combo: ' + combining, 'info', 'loader');
             // will pass that module name to this function.  Storing this
             // data to avoid loading the same module multiple times
             // centralize this in the callback
-            this.inserted[mname] = true;
-            // this.loaded[mname] = true;
+            self.inserted[mname] = true;
+            // self.loaded[mname] = true;
 
-            // provided = this.getProvides(mname);
-            // Y.mix(this.loaded, provided);
-            // Y.mix(this.inserted, provided);
+            // provided = self.getProvides(mname);
+            // Y.mix(self.loaded, provided);
+            // Y.mix(self.inserted, provided);
 
-            if (this.onProgress) {
-                this.onProgress.call(this.context, {
+            if (self.onProgress) {
+                self.onProgress.call(self.context, {
                         name: mname,
-                        data: this.data
+                        data: self.data
                     });
             }
         }
 
-        s = this.sorted;
+        s = self.sorted;
         len = s.length;
 
         for (i = 0; i < len; i = i + 1) {
             // this.inserted keeps track of what the loader has loaded.
             // move on if this item is done.
-            if (s[i] in this.inserted) {
+            if (s[i] in self.inserted) {
                 continue;
             }
 
@@ -2143,51 +2062,51 @@ Y.log('Attempting to use combo: ' + combining, 'info', 'loader');
             // from Y, loadNext may be called multiple times for
             // the same module when loading a rollup.  We can safely
             // skip the subsequent requests
-            if (s[i] === this._loading) {
+            if (s[i] === self._loading) {
                 Y.log('still loading ' + s[i] + ', waiting', 'info', 'loader');
                 return;
             }
 
             // log("inserting " + s[i]);
-            m = this.getModule(s[i]);
+            m = self.getModule(s[i]);
 
             if (!m) {
                 msg = 'Undefined module ' + s[i] + ' skipped';
                 Y.log(msg, 'warn', 'loader');
-                // this.inserted[s[i]] = true;
-                this.skipped[s[i]] = true;
+                // self.inserted[s[i]] = true;
+                self.skipped[s[i]] = true;
                 continue;
 
             }
 
-            group = (m.group && this.groups[m.group]) || NOT_FOUND;
+            group = (m.group && self.groups[m.group]) || NOT_FOUND;
 
             // The load type is stored to offer the possibility to load
             // the css separately from the script.
             if (!type || type === m.type) {
-                this._loading = s[i];
-Y.log('attempting to load ' + s[i] + ', ' + this.base, 'info', 'loader');
+                self._loading = s[i];
+Y.log('attempting to load ' + s[i] + ', ' + self.base, 'info', 'loader');
 
                 if (m.type === CSS) {
                     fn = Y.Get.css;
-                    attr = this.cssAttributes;
+                    attr = self.cssAttributes;
                 } else {
                     fn = Y.Get.script;
-                    attr = this.jsAttributes;
+                    attr = self.jsAttributes;
                 }
 
-                url = (m.fullpath) ? this._filter(m.fullpath, s[i]) :
-                      this._url(m.path, s[i], group.base || m.base);
+                url = (m.fullpath) ? self._filter(m.fullpath, s[i]) :
+                      self._url(m.path, s[i], group.base || m.base);
 
                 fn(url, {
                     data: s[i],
                     onSuccess: handleSuccess,
-                    insertBefore: this.insertBefore,
-                    charset: this.charset,
+                    insertBefore: self.insertBefore,
+                    charset: self.charset,
                     attributes: attr,
-                    onFailure: this._onFailure,
-                    onTimeout: this._onTimeout,
-                    timeout: this.timeout,
+                    onFailure: self._onFailure,
+                    onTimeout: self._onTimeout,
+                    timeout: self.timeout,
                     autopurge: false,
                     context: self
                 });
@@ -2197,18 +2116,18 @@ Y.log('attempting to load ' + s[i] + ', ' + this.base, 'info', 'loader');
         }
 
         // we are finished
-        this._loading = null;
+        self._loading = null;
 
-        fn = this._internalCallback;
+        fn = self._internalCallback;
 
         // internal callback for loading css first
         if (fn) {
             // Y.log('loader internal');
-            this._internalCallback = null;
-            fn.call(this);
+            self._internalCallback = null;
+            fn.call(self);
         } else {
             // Y.log('loader complete');
-            this._onSuccess();
+            self._onSuccess();
         }
     },
 
@@ -2435,23 +2354,22 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
         "submodules": {
             "autocomplete-base": {
                 "optional": [
-                    "jsonp", 
-                    "yql"
+                    "autocomplete-sources"
                 ], 
                 "plugins": {
                     "autocomplete-filters": {
                         "path": "autocomplete/autocomplete-filters-min.js", 
                         "requires": [
                             "array-extras", 
-                            "unicode-wordbreak"
+                            "text-wordbreak"
                         ]
                     }, 
                     "autocomplete-filters-accentfold": {
                         "path": "autocomplete/autocomplete-filters-accentfold-min.js", 
                         "requires": [
                             "array-extras", 
-                            "unicode-accentfold", 
-                            "unicode-wordbreak"
+                            "text-accentfold", 
+                            "text-wordbreak"
                         ]
                     }, 
                     "autocomplete-highlighters": {
@@ -2472,11 +2390,13 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                 "requires": [
                     "array-extras", 
                     "base-build", 
+                    "escape", 
                     "event-valuechange", 
                     "node-base"
                 ]
             }, 
             "autocomplete-list": {
+                "after": "autocomplete-sources", 
                 "lang": [
                     "en"
                 ], 
@@ -2515,12 +2435,24 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                 }, 
                 "requires": [
                     "autocomplete-base", 
+                    "selector-css3", 
                     "widget", 
                     "widget-position", 
                     "widget-position-align", 
                     "widget-stack"
                 ], 
                 "skinnable": true
+            }, 
+            "autocomplete-sources": {
+                "optional": [
+                    "io-base", 
+                    "json-parse", 
+                    "jsonp", 
+                    "yql"
+                ], 
+                "requires": [
+                    "autocomplete-base"
+                ]
             }
         }
     }, 
@@ -2561,6 +2493,17 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                 ]
             }
         }
+    }, 
+    "charts": {
+        "requires": [
+            "dom", 
+            "datatype", 
+            "event-custom", 
+            "event-mouseenter", 
+            "widget", 
+            "widget-position", 
+            "widget-stack"
+        ]
     }, 
     "classnamemanager": {
         "requires": [
@@ -2787,11 +2730,16 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                 "requires": [
                     "recordset-base", 
                     "widget", 
-                    "intl", 
                     "substitute", 
                     "event-mouseenter"
                 ], 
                 "skinnable": true
+            }, 
+            "datatable-datasource": {
+                "requires": [
+                    "datatable-base", 
+                    "datasource-local"
+                ]
             }, 
             "datatable-scroll": {
                 "requires": [
@@ -2801,6 +2749,9 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                 ]
             }, 
             "datatable-sort": {
+                "lang": [
+                    "en"
+                ], 
                 "requires": [
                     "datatable-base", 
                     "plugin", 
@@ -3000,12 +2951,17 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
         }
     }, 
     "dial": {
+        "lang": [
+            "en", 
+            "es"
+        ], 
         "requires": [
             "widget", 
             "dd-drag", 
             "substitute", 
             "event-mouseenter", 
-            "transition"
+            "transition", 
+            "intl"
         ], 
         "skinnable": true
     }, 
@@ -3018,8 +2974,33 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
             }, 
             "dom-style-ie": {
                 "condition": {
-                    "trigger": "dom-style", 
-                    "ua": "ie"
+                    "test": function (Y) {
+
+    var testFeature = Y.Features.test,
+        addFeature = Y.Features.add,
+        WINDOW = Y.config.win,
+        DOCUMENT = Y.config.doc,
+        DOCUMENT_ELEMENT = 'documentElement',
+        ret = false;
+
+    addFeature('style', 'computedStyle', {
+        test: function() {
+            return WINDOW && 'getComputedStyle' in WINDOW;
+        }
+    });
+
+    addFeature('style', 'opacity', {
+        test: function() {
+            return DOCUMENT && 'opacity' in DOCUMENT[DOCUMENT_ELEMENT].style;
+        }
+    });
+
+    ret =  (!testFeature('style', 'opacity') &&
+            !testFeature('style', 'computedStyle'));
+
+    return ret;
+}, 
+                    "trigger": "dom-style"
                 }, 
                 "requires": [
                     "dom-style"
@@ -3138,8 +3119,11 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "event-base"
                 ], 
                 "condition": {
-                    "trigger": "node-base", 
-                    "ua": "ie"
+                    "test": function(Y) {
+    var imp = Y.config.doc && Y.config.doc.implementation;
+    return (imp && (!imp.hasFeature('Events', '2.0')));
+}, 
+                    "trigger": "node-base"
                 }, 
                 "requires": [
                     "node-base"
@@ -3164,6 +3148,11 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                 ]
             }, 
             "event-focus": {
+                "requires": [
+                    "event-synthetic"
+                ]
+            }, 
+            "event-hover": {
                 "requires": [
                     "event-synthetic"
                 ]
@@ -3244,14 +3233,14 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
             "highlight-accentfold": {
                 "requires": [
                     "highlight-base", 
-                    "unicode-accentfold"
+                    "text-accentfold"
                 ]
             }, 
             "highlight-base": {
                 "requires": [
                     "array-extras", 
                     "escape", 
-                    "unicode-wordbreak"
+                    "text-wordbreak"
                 ]
             }
         }
@@ -3492,19 +3481,6 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
         ], 
         "skinnable": true
     }, 
-    "node-tokeninput": {
-        "requires": [
-            "array-extras", 
-            "classnamemanager", 
-            "event-focus", 
-            "event-valuechange", 
-            "node-event-delegate", 
-            "node-pluginhost", 
-            "node-style", 
-            "plugin"
-        ], 
-        "skinnable": true
-    }, 
     "oop": {
         "requires": [
             "yui-base"
@@ -3594,7 +3570,8 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
             "recordset-filter": {
                 "requires": [
                     "recordset-base", 
-                    "array-extras"
+                    "array-extras", 
+                    "plugin"
                 ]
             }, 
             "recordset-indexer": {
@@ -3606,7 +3583,8 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
             "recordset-sort": {
                 "requires": [
                     "arraysort", 
-                    "recordset-base"
+                    "recordset-base", 
+                    "plugin"
                 ]
             }
         }
@@ -3663,8 +3641,7 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                 "path": "scrollview/scrollview-paginator-min.js", 
                 "requires": [
                     "plugin"
-                ], 
-                "skinnable": true
+                ]
             }, 
             "scrollview-scrollbars": {
                 "path": "scrollview/scrollview-scrollbars-min.js", 
@@ -3774,6 +3751,24 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
         ], 
         "skinnable": true
     }, 
+    "text": {
+        "submodules": {
+            "text-accentfold": {
+                "requires": [
+                    "array-extras", 
+                    "text-data-accentfold"
+                ]
+            }, 
+            "text-data-accentfold": {}, 
+            "text-data-wordbreak": {}, 
+            "text-wordbreak": {
+                "requires": [
+                    "array-extras", 
+                    "text-data-wordbreak"
+                ]
+            }
+        }
+    }, 
     "transition": {
         "submodules": {
             "transition-native": {
@@ -3785,24 +3780,6 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                 "requires": [
                     "transition-native", 
                     "node-style"
-                ]
-            }
-        }
-    }, 
-    "unicode": {
-        "submodules": {
-            "unicode-accentfold": {
-                "requires": [
-                    "array-extras", 
-                    "unicode-data-accentfold"
-                ]
-            }, 
-            "unicode-data-accentfold": {}, 
-            "unicode-data-wordbreak": {}, 
-            "unicode-wordbreak": {
-                "requires": [
-                    "array-extras", 
-                    "unicode-data-wordbreak"
                 ]
             }
         }
@@ -3962,7 +3939,7 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
         }
     }
 };
-YUI.Env[Y.version].md5 = '2f531a82a518eb3682f9a04bf1eaa329';
+YUI.Env[Y.version].md5 = '0137a33383a0e8b7774aa8c70b06bcb2';
 
 
 }, '@VERSION@' ,{requires:['loader-base']});

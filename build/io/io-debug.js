@@ -173,12 +173,15 @@ YUI.add('io-base', function(Y) {
 
 
     function _destroy(o) {
-        // IE, when using XMLHttpRequest as an ActiveX Object, will throw
-        // a "Type Mismatch" error if the event handler is set to "null".
-        if (w && w.XMLHttpRequest) {
-            if (o.c) {
+        if (w) {
+            if (o.c && w.XMLHttpRequest) {
                 o.c.onreadystatechange = null;
             }
+			else if (Y.UA.ie === 6 && !o.t) {
+				// IE, when using XMLHttpRequest as an ActiveX Object, will throw
+				// a "Type Mismatch" error if the event handler is set to "null".
+				o.c.abort();
+			}
         }
 
         o.c = null;
@@ -437,14 +440,19 @@ YUI.add('io-base', function(Y) {
 
         for (p in _headers) {
             if (_headers.hasOwnProperty(p)) {
+				/*
                 if (h[p]) {
-                    // Configuration headers will supersede io preset headers,
+                    // Configuration headers will supersede preset io headers,
                     // if headers match.
                     continue;
                 }
                 else {
                     h[p] = _headers[p];
                 }
+				*/
+				if (!h[p]) {
+					h[p] = _headers[p];
+				}
             }
         }
 
@@ -1026,7 +1034,7 @@ YUI.add('io-xdr', function(Y) {
             return { id: o.id, c: { responseText: s, responseXML: x } };
         }
         else {
-            return { id: o.id, status: o.e };
+            return { id: o.id, e: o.e };
         }
 
     }
@@ -1091,7 +1099,15 @@ YUI.add('io-xdr', function(Y) {
 				// ExternalInterface.  Doing so will result in exceptions.
 				c.context = null;
 				c.form = null;
-				w.setTimeout(function() { o.c.send(uri, c, o.id); }, Y.io.xdr.delay);
+
+				w.setTimeout(function() {
+					if (o.c) {
+						o.c.send(uri, c, o.id);
+					}
+					else {
+						Y.io.xdrResponse(o, c, 'transport error');
+					}
+				}, Y.io.xdr.delay);
 			}
 			else if (ie) {
 				_evt(o, c);
@@ -1141,7 +1157,7 @@ YUI.add('io-xdr', function(Y) {
                 }
             }
 
-            switch (e.toLowerCase()) {
+            switch (e) {
                 case 'start':
                     Y.io.start(o.id, c);
                     break;
@@ -1149,16 +1165,14 @@ YUI.add('io-xdr', function(Y) {
                     Y.io.complete(o, c);
                     break;
                 case 'success':
-                    Y.io.success(t || f ?  _data(o, f, t) : o, c);
+                    Y.io.success(t || f ? _data(o, f, t) : o, c);
                     delete m[o.id];
                     break;
                 case 'timeout':
                 case 'abort':
+				case 'transport error':
+					o.e = e;
                 case 'failure':
-                    if (e === ('abort' || 'timeout')) {
-                        o.e = e;
-                    }
-
                     Y.io.failure(t || f ? _data(o, f, t) : o, c);
                     delete m[o.id];
                     break;
@@ -1211,12 +1225,12 @@ YUI.add('io-xdr', function(Y) {
 	* event io.swf has not finished loading.  Once the E_XDR_READY
     * event is fired, this value will be set to 0.
 	*
-	* @property _delay
+	* @property delay
 	* @public
 	* @static
 	* @type number
 	*/
-	Y.io.xdr.delay = 100;
+	Y.io.xdr.delay = 50;
 
 
 
@@ -1233,7 +1247,8 @@ YUI.add('io-upload-iframe', function(Y) {
 
     var w = Y.config.win,
         d = Y.config.doc,
-        _std = (d.documentMode && d.documentMode >= 8);
+        _std = (d.documentMode && d.documentMode >= 8),
+		_d = decodeURIComponent;
    /**
     * @description Parses the POST data object and creates hidden form elements
     * for each key-value, and appends them to the HTML form object.
@@ -1252,8 +1267,8 @@ YUI.add('io-upload-iframe', function(Y) {
         for (i = 0, l = m.length - 1; i < l; i++) {
             o[i] = d.createElement('input');
             o[i].type = 'hidden';
-            o[i].name = m[i].substring(m[i].lastIndexOf('&') + 1);
-            o[i].value = (i + 1 === l) ? m[i + 1] : m[i + 1].substring(0, (m[i + 1].lastIndexOf('&')));
+            o[i].name = _d(m[i].substring(m[i].lastIndexOf('&') + 1));
+            o[i].value = (i + 1 === l) ? _d(m[i + 1]) : _d(m[i + 1].substring(0, (m[i + 1].lastIndexOf('&'))));
             f.appendChild(o[i]);
             Y.log('key: ' +  o[i].name + ' and value: ' + o[i].value + ' added as form data.', 'info', 'io');
         }
@@ -1274,7 +1289,7 @@ YUI.add('io-upload-iframe', function(Y) {
     function _removeData(f, o) {
         var i, l;
 
-        for(i = 0, l = o.length; i < l; i++){
+        for (i = 0, l = o.length; i < l; i++) {
             f.removeChild(o[i]);
         }
     }
@@ -1298,8 +1313,7 @@ YUI.add('io-upload-iframe', function(Y) {
     }
 
    /**
-    * @description Sets the appropriate attributes and values to the HTML
-    * form, in preparation of a file upload transaction.
+    * @description Reset the HTML form attributes to their original values.
     * @method _resetAttrs
     * @private
     * @static
@@ -1311,7 +1325,7 @@ YUI.add('io-upload-iframe', function(Y) {
         var p;
 
         for (p in a) {
-            if (a.hasOwnProperty(a, p)) {
+            if (a.hasOwnProperty(p)) {
                 if (a[p]) {
                     f.setAttribute(p, f[p]);
                 }
@@ -1395,7 +1409,7 @@ YUI.add('io-upload-iframe', function(Y) {
         if (b) {
             // When a response Content-Type of "text/plain" is used, Firefox and Safari
             // will wrap the response string with <pre></pre>.
-            p = b.query('pre:first-child');
+            p = b.one('pre:first-child');
             o.c.responseText = p ? p.get('text') : b.get('text');
             Y.log('The responseText value for transaction ' + o.id + ' is: ' + o.c.responseText + '.', 'info', 'io');
         }

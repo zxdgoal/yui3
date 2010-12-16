@@ -47,7 +47,9 @@
                         //This causes IE to not allow a selection on a doubleclick
                         //rng.select(nodes[i]);
                         if (rng.inRange(sel)) {
-                           ieNode = nodes[i]; 
+                            if (!ieNode) {
+                                ieNode = nodes[i];
+                            }
                         }
                     }
                 }
@@ -58,6 +60,11 @@
                     if (ieNode.nodeType !== 3) {
                         if (ieNode.firstChild) {
                             ieNode = ieNode.firstChild;
+                        }
+                        if (ieNode && ieNode.tagName && ieNode.tagName.toLowerCase() === 'body') {
+                            if (ieNode.firstChild) {
+                                ieNode = ieNode.firstChild;
+                            }
                         }
                     }
                     this.anchorNode = this.focusNode = Y.Selection.resolve(ieNode);
@@ -154,12 +161,22 @@
         Y.each(hrs, function(hr) {
             var el = doc.createElement('div');
                 el.className = 'hr yui-non yui-skip';
-                el.setAttribute('style', 'border: 1px solid #ccc; line-height: 0; font-size: 0;margin-top: 5px; margin-bottom: 5px;');
+                
                 el.setAttribute('readonly', true);
                 el.setAttribute('contenteditable', false); //Keep it from being Edited
                 if (hr.parentNode) {
                     hr.parentNode.replaceChild(el, hr);
                 }
+                //Had to move to inline style. writes for ie's < 8. They don't render el.setAttribute('style');
+                var s = el.style;
+                s.border = '1px solid #ccc';
+                s.lineHeight = '0';
+                s.fontSize = '0';
+                s.marginTop = '5px';
+                s.marginBottom = '5px';
+                s.marginLeft = '0px';
+                s.marginRight = '0px';
+                s.padding = '0';
         });
         
 
@@ -237,9 +254,12 @@
             Y.log('Only One default block tag (' + Y.Selection.DEFAULT_BLOCK_TAG + '), focus it..', 'info', 'selection');
             br = single.item(0).all('br');
             if (br.size() === 1) {
-                br.item(0).remove();
+                if (!br.item(0).test('.yui-cursor')) {
+                    br.item(0).remove();
+                }
                 var html = single.item(0).get('innerHTML');
                 if (html === '' || html === ' ') {
+                    Y.log('Paragraph empty, focusing cursor', 'info', 'selection');
                     single.set('innerHTML', Y.Selection.CURSOR);
                     sel = new Y.Selection();
                     sel.focusCursor(true, true);
@@ -380,7 +400,8 @@
         }
         
         Y.all('.hr').addClass('yui-skip').addClass('yui-non');
-
+        
+        /*
         nodes.each(function(n) {
             n.addClass(n._yuid);
             n.setStyle(FONT_FAMILY, '');
@@ -388,6 +409,7 @@
                 n.removeAttribute('style');
             }
         });
+        */
         
         return html;
     };
@@ -399,14 +421,15 @@
     * @return {Node} The Resolved node
     */
     Y.Selection.resolve = function(n) {
-        console.log(n);
         if (n && n.nodeType === 3) {
             //Adding a try/catch here because in rare occasions IE will
             //Throw a error accessing the parentNode of a stranded text node.
             //In the case of Ctrl+Z (Undo)
             try {
                 n = n.parentNode;
-            } catch (re) {}
+            } catch (re) {
+                n = 'body';
+            }
         }
         return Y.one(n);
     };
@@ -473,7 +496,7 @@
     * @static
     * @property CURSOR
     */
-    Y.Selection.CURSOR = '<span id="' + Y.Selection.CURID + '"><br class="yui-cursor"></span>';
+    Y.Selection.CURSOR = '<span><br class="yui-cursor"></span>';
 
     Y.Selection.hasCursor = function() {
         var cur = Y.all('#' + Y.Selection.CUR_WRAPID);
@@ -487,6 +510,7 @@
     * @method cleanCursor
     */
     Y.Selection.cleanCursor = function() {
+        //Y.log('Cleaning Cursor', 'info', 'Selection');
         var cur, sel = 'br.yui-cursor';
         cur = Y.all(sel);
         if (cur.size()) {
@@ -706,7 +730,11 @@
                     if (html === '' || html === '<br>') {
                         node.append(newNode);
                     } else {
-                        node.insert(newNode, 'before');
+                        if (newNode.get('parentNode')) {
+                            node.insert(newNode, 'before');
+                        } else {
+                            Y.one('body').prepend(newNode);
+                        }
                     }
                     if (node.get('firstChild').test('br')) {
                         node.get('firstChild').remove();
@@ -824,6 +852,10 @@
         * @return {Y.Selection}
         */
         selectNode: function(node, collapse, end) {
+            if (!node) {
+                Y.log('Node passed to selectNode is null', 'error', 'selection');
+                return;
+            }
             end = end || 0;
             node = Y.Node.getDOMNode(node);
 		    var range = this.createRange();

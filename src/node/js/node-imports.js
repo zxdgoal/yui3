@@ -101,8 +101,8 @@ Y.Array.each([
     'createCaption'
 
 ], function(method) {
-    Y.Node.prototype[method] = function(arg1, arg2, arg3) {
     Y.log('adding: ' + method, 'info', 'node');
+    Y.Node.prototype[method] = function(arg1, arg2, arg3) {
         var ret = this.invoke(method, arg1, arg2, arg3);
         return ret;
     };
@@ -151,7 +151,14 @@ Y.Node.importMethod(Y.DOM, [
      * @method unwrap
      * @chainable
      */
-    'unwrap'
+    'unwrap',
+
+    /**
+     * Applies a unique ID to the node if none exists
+     * @method generateID
+     * @return {String} The existing or generated ID
+     */
+    'generateID'
 ]);
 
 Y.NodeList.importMethod(Y.Node.prototype, [
@@ -199,5 +206,12 @@ Y.NodeList.importMethod(Y.Node.prototype, [
  * @param {String} html The markup to wrap around the node. 
  * @chainable
  */
-    'wrap'
+    'wrap',
+
+/**
+ * Applies a unique ID to each node if none exists
+ * @method generateID
+ * @return {String} The existing or generated ID
+ */
+    'generateID'
 ]);

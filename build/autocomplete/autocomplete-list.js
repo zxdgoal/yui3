@@ -77,8 +77,8 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
         this[_SELECTOR_ITEM]     = '.' + this[_CLASS_ITEM];
 
         /**
-         * Fires when an autocomplete suggestion is selected from the list by
-         * a keyboard action or mouse click.
+         * Fires when an autocomplete suggestion is selected from the list,
+         * typically via a keyboard action or mouse click.
          *
          * @event select
          * @param {EventFacade} e Event facade with the following additional
@@ -96,7 +96,7 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
          *   </dd>
          * </dl>
          *
-         * @preventable _defResultsFn
+         * @preventable _defSelectFn
          */
         this.publish(EVT_SELECT, {
             defaultFn: this._defSelectFn
@@ -118,13 +118,12 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
         var ariaNode   = this._createAriaNode(),
             contentBox = this.get('contentBox'),
             inputNode  = this._inputNode,
-            listNode   = this.get('listNode'),
+            listNode,
             parentNode = inputNode.get('parentNode');
 
-        if (!listNode) {
-            listNode = this._createListNode();
-            contentBox.append(listNode);
-        }
+        listNode = this._createListNode();
+        this._set('listNode', listNode);
+        contentBox.append(listNode);
 
         inputNode.addClass(this.getClassName('input')).setAttrs({
             'aria-autocomplete': LIST,
@@ -299,7 +298,7 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
         }
 
         // Attach inputNode events.
-        this._listEvents.push(inputNode.on('blur', this._onInputBlur, this));
+        this._listEvents.push(inputNode.on('blur', this._onListInputBlur, this));
     },
 
     /**
@@ -310,14 +309,16 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
      */
     _bindList: function () {
         this._listEvents.concat([
-            this.after('mouseover', this._afterMouseOver),
-            this.after('mouseout', this._afterMouseOut),
+            this.after({
+              mouseover: this._afterMouseOver,
+              mouseout : this._afterMouseOut,
 
-            this.after('activeItemChange', this._afterActiveItemChange),
-            this.after('alwaysShowListChange', this._afterAlwaysShowListChange),
-            this.after('hoveredItemChange', this._afterHoveredItemChange),
-            this.after('resultsChange', this._afterResultsChange),
-            this.after('visibleChange', this._afterVisibleChange),
+              activeItemChange    : this._afterActiveItemChange,
+              alwaysShowListChange: this._afterAlwaysShowListChange,
+              hoveredItemChange   : this._afterHoveredItemChange,
+              resultsChange       : this._afterResultsChange,
+              visibleChange       : this._afterVisibleChange
+            }),
 
             this._listNode.delegate('click', this._onItemClick, this[_SELECTOR_ITEM], this)
         ]);
@@ -482,15 +483,21 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
             newVal    = e.newVal,
             prevVal   = e.prevVal;
 
-        if (prevVal) {
+        // The previous item may have disappeared by the time this handler runs,
+        // so we need to be careful.
+        if (prevVal && prevVal._node) {
             prevVal.removeClass(this[_CLASS_ITEM_ACTIVE]);
         }
 
         if (newVal) {
-            newVal.addClass(this[_CLASS_ITEM_ACTIVE]).scrollIntoView();
+            newVal.addClass(this[_CLASS_ITEM_ACTIVE]);
             inputNode.set('aria-activedescendant', newVal.get(ID));
         } else {
-            inputNode.scrollIntoView();
+            inputNode.removeAttribute('aria-activedescendant');
+        }
+
+        if (this.get('scrollIntoView')) {
+            (newVal || inputNode).scrollIntoView();
         }
     },
 
@@ -583,11 +590,11 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
     /**
      * Handles <code>inputNode</code> <code>blur</code> events.
      *
-     * @method _onInputBlur
+     * @method _onListInputBlur
      * @param {EventTarget} e
      * @protected
      */
-    _onInputBlur: function (e) {
+    _onListInputBlur: function (e) {
         // Hide the list on inputNode blur events, unless the mouse is currently
         // over the list (which indicates that the user is probably interacting
         // with it). The _lastInputKey property comes from the
@@ -701,6 +708,30 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
         },
 
         /**
+         * Node that will contain result items.
+         *
+         * @attribute listNode
+         * @type Node|null
+         * @readonly
+         */
+        listNode: {
+            readOnly: true,
+            value: null
+        },
+
+        /**
+         * If <code>true</code>, the viewport will be scrolled to ensure that
+         * the active list item is visible when necessary.
+         *
+         * @attribute scrollIntoView
+         * @type Boolean
+         * @default false
+         */
+        scrollIntoView: {
+            value: false
+        },
+
+        /**
          * Translatable strings used by the AutoCompleteList widget.
          *
          * @attribute strings
@@ -730,20 +761,7 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
         }
     },
 
-    CSS_PREFIX: Y.ClassNameManager.getClassName('aclist'),
-
-    HTML_PARSER: {
-        /**
-         * Node that will contain result items.
-         *
-         * @attribute listNode
-         * @type Node|null
-         * @readonly
-         */
-        listNode: function () {
-            return this.getClassName(LIST);
-        }
-    }
+    CSS_PREFIX: Y.ClassNameManager.getClassName('aclist')
 });
 
 Y.AutoCompleteList = List;
@@ -758,4 +776,4 @@ Y.AutoCompleteList = List;
 Y.AutoComplete = List;
 
 
-}, '@VERSION@' ,{skinnable:true, requires:['autocomplete-base', 'widget', 'widget-position', 'widget-position-align', 'widget-stack'], lang:['en']});
+}, '@VERSION@' ,{lang:['en'], requires:['autocomplete-base', 'selector-css3', 'widget', 'widget-position', 'widget-position-align', 'widget-stack'], after:['autocomplete-sources'], skinnable:true});

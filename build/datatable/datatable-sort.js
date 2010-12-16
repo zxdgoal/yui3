@@ -15,12 +15,9 @@ YUI.add('datatable-sort', function(Y) {
 var YgetClassName = Y.ClassNameManager.getClassName,
 
     DATATABLE = "datatable",
+    COLUMN = "column",
     ASC = "asc",
     DESC = "desc",
-    
-    CLASS_ASC = YgetClassName(DATATABLE, "asc"),
-    CLASS_DESC = YgetClassName(DATATABLE, "desc"),
-    CLASS_SORTABLE = YgetClassName(DATATABLE, "sortable"),
 
     //TODO: Don't use hrefs - use tab/arrow/enter
     TEMPLATE = '<a class="{link_class}" title="{link_title}" href="{link_href}">{value}</a>';
@@ -71,7 +68,7 @@ Y.mix(DataTableSort, {
         * column to sort.
         * @type String
         * @default "theadCellClick"
-        * @initOnly
+        * @writeOnce "initOnly"
         */
         trigger: {
             value: "theadCellClick",
@@ -79,12 +76,14 @@ Y.mix(DataTableSort, {
         },
         
         /**
-        * @attribute sortedBy
-        * @description Sort state: {field,dir}
+        * @attribute lastSortedBy
+        * @description Describes last known sort state: {key,dir}, where
+        * "key" is column key and "dir" is either "asc" or "desc".
         * @type Object
         */
-        sortedBy: {
-            value: null
+        lastSortedBy: {
+            setter: "_setLastSortedBy",
+            lazyAdd: false
         },
         
         /**
@@ -127,32 +126,88 @@ Y.extend(DataTableSort, Y.Plugin.Base, {
         this.doBefore("_createTheadThNode", this._beforeCreateTheadThNode);
         
         // Add class
-        this.doBefore("_attachTheadThNode", function(o) {
-            if(o.column.get("sortable")) {
-                o.th.addClass(CLASS_SORTABLE);
-            }
-        });
+        this.doBefore("_attachTheadThNode", this._beforeAttachTheadThNode);
+        this.doBefore("_attachTbodyTdNode", this._beforeAttachTbodyTdNode);
 
         // Attach trigger handlers
-        dt.on(this.get("trigger"), this._onEventSortColumn);
+        dt.on(this.get("trigger"), Y.bind(this._onEventSortColumn,this));
 
         // Attach UI hooks
         dt.after("recordsetSort:sort", function() {
-            dt._uiSetRecordset(dt.get("recordset"));
+            this._uiSetRecordset(this.get("recordset"));
         });
-        dt.after("sortedByChangeEvent", function() {
-            //alert('ok');
+        this.on("lastSortedByChange", function(e) {
+            this._uiSetLastSortedBy(e.prevVal, e.newVal, dt);
         });
 
         //TODO
-        //dt.after("recordset:mutation", function() {//reset sortedBy});
+        //dt.after("recordset:mutation", function() {//reset lastSortedBy});
         
         //TODO
         //add Column sortFn ATTR
         
-        // Update UI after the fact (plug-then-render case)
+        // Update UI after the fact (render-then-plug case)
         if(dt.get("rendered")) {
             dt._uiSetColumnset(dt.get("columnset"));
+            this._uiSetLastSortedBy(null, this.get("lastSortedBy"), dt);
+        }
+    },
+
+    /**
+    * @method _setLastSortedBy
+    * @description Normalizes lastSortedBy
+    * @param val {String | Object} {key, dir} or "key"
+    * @returns {key, dir, notdir}
+    * @private
+    */
+    _setLastSortedBy: function(val) {
+        if(Y.Lang.isString(val)) {
+            return {key:val, dir:"asc", notdir:"desc"};
+        }
+        else if (val && val.key) {
+            if(val.dir === "desc") {
+                return {key:val.key, dir:"desc", notdir:"asc"};
+            }
+            else {
+                return {key:val.key, dir:"asc", notdir:"desc"};
+            }
+        }
+        else {
+            return null;
+        }
+    },
+
+    /**
+     * Updates sort UI.
+     *
+     * @method _uiSetLastSortedBy
+     * @param val {Object} New lastSortedBy object {key,dir}.
+     * @param dt {Y.DataTable.Base} Host.
+     * @protected
+     */
+    _uiSetLastSortedBy: function(prevVal, newVal, dt) {
+        var prevKey = prevVal && prevVal.key,
+            prevDir = prevVal && prevVal.dir,
+            newKey = newVal && newVal.key,
+            newDir = newVal && newVal.dir,
+            cs = dt.get("columnset"),
+            prevColumn = cs.keyHash[prevKey],
+            newColumn = cs.keyHash[newKey],
+            tbodyNode = dt._tbodyNode,
+            prevRowList, newRowList;
+
+        // Clear previous UI
+        if(prevColumn) {
+            prevColumn.thNode.removeClass(YgetClassName(DATATABLE, prevDir));
+            prevRowList = tbodyNode.all("."+YgetClassName(COLUMN, prevColumn.get("id")));
+            prevRowList.removeClass(YgetClassName(DATATABLE, prevDir));
+        }
+
+        // Add new sort UI
+        if(newColumn) {
+            newColumn.thNode.addClass(YgetClassName(DATATABLE, newDir));
+            newRowList = tbodyNode.all("."+YgetClassName(COLUMN, newColumn.get("id")));
+            newRowList.addClass(YgetClassName(DATATABLE, newDir));
         }
     },
 
@@ -166,35 +221,82 @@ Y.extend(DataTableSort, Y.Plugin.Base, {
     _beforeCreateTheadThNode: function(o) {
         if(o.column.get("sortable")) {
             o.value = Y.substitute(this.get("template"), {
-                link_class: "foo",
-                link_title: "bar",
-                link_href: "bat",
+                link_class: o.link_class || "",
+                link_title: "title",
+                link_href: "#",
                 value: o.value
             });
         }
     },
 
     /**
-    * In response to the "trigger" event, sorts the underlying Recordset and
-    * updates the sortedBy attribute.
+    * Before header cell element is attached, sets applicable class names.
     *
-    * @method _beforeCreateTheadThNode
+    * @method _beforeAttachTheadThNode
+    * @param o {Object} {value, column, tr}.
+    * @protected
+    */
+    _beforeAttachTheadThNode: function(o) {
+        var lastSortedBy = this.get("lastSortedBy"),
+            key = lastSortedBy && lastSortedBy.key,
+            dir = lastSortedBy && lastSortedBy.dir,
+            notdir = lastSortedBy && lastSortedBy.notdir;
+
+        // This Column is sortable
+        if(o.column.get("sortable")) {
+            o.th.addClass(YgetClassName(DATATABLE, "sortable"));
+        }
+        // This Column is currently sorted
+        if(key && (key === o.column.get("key"))) {
+            o.th.replaceClass(YgetClassName(DATATABLE, notdir), YgetClassName(DATATABLE, dir));
+        }
+    },
+
+    /**
+    * Before header cell element is attached, sets applicable class names.
+    *
+    * @method _before_beforeAttachTbodyTdNode
+    * @param o {Object} {record, column, tr, headers, classnames, value}.
+    * @protected
+    */
+    _beforeAttachTbodyTdNode: function(o) {
+        var lastSortedBy = this.get("lastSortedBy"),
+            key = lastSortedBy && lastSortedBy.key,
+            dir = lastSortedBy && lastSortedBy.dir,
+            notdir = lastSortedBy && lastSortedBy.notdir;
+
+        // This Column is sortable
+        if(o.column.get("sortable")) {
+            o.td.addClass(YgetClassName(DATATABLE, "sortable"));
+        }
+        // This Column is currently sorted
+        if(key && (key === o.column.get("key"))) {
+            o.td.replaceClass(YgetClassName(DATATABLE, notdir), YgetClassName(DATATABLE, dir));
+        }
+    },
+    /**
+    * In response to the "trigger" event, sorts the underlying Recordset and
+    * updates the lastSortedBy attribute.
+    *
+    * @method _onEventSortColumn
     * @param o {Object} {value, column, tr}.
     * @protected
     */
     _onEventSortColumn: function(e) {
         e.halt();
         //TODO: normalize e.currentTarget to TH
-        var column = this.get("columnset").get("hash")[e.currentTarget.get("id")],
+        var dt = this.get("host"),
+            column = dt.get("columnset").idHash[e.currentTarget.get("id")],
+            key = column.get("key"),
             field = column.get("field"),
-            prevSortedBy = this.get("sortedBy"),
-            dir = (prevSortedBy &&
-                prevSortedBy.field === field &&
-                prevSortedBy.dir === ASC) ? DESC : ASC,
+            lastSortedBy = this.get("lastSortedBy"),
+            dir = (lastSortedBy &&
+                lastSortedBy.key === key &&
+                lastSortedBy.dir === ASC) ? DESC : ASC,
             sorter = column.get("sortFn");
         if(column.get("sortable")) {
-            this.get("recordset").sort.sort(field, dir === DESC, sorter);
-            this.set("sortedBy", {field: field, dir: dir});
+            dt.get("recordset").sort.sort(field, dir === DESC, sorter);
+            this.set("lastSortedBy", {key: key, dir: dir});
         }
     }
 });

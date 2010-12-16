@@ -1009,8 +1009,9 @@ Y.CustomEvent.prototype = {
         }
 
         if (s) {
-            delete s.fn;
-            delete s.context;
+            // delete s.fn;
+            // delete s.context;
+            s.deleted = true;
         }
     }
 };
@@ -1075,6 +1076,15 @@ Y.Subscriber = function(fn, context, args) {
 Y.Subscriber.prototype = {
 
     _notify: function(c, args, ce) {
+        if (this.deleted && !this.postponed) {
+            if (this.postponed) {
+                delete this.fn;
+                delete this.context;
+            } else {
+                delete this.postponed;
+                return null;
+            }
+        }
         var a = this.args, ret;
         switch (ce.signature) {
             case 0:
@@ -1292,6 +1302,26 @@ ET.prototype = {
             }
         });
         return handle;
+    },
+
+    /**
+     * Takes the type parameter passed to 'on' and parses out the
+     * various pieces that could be included in the type.  If the
+     * event type is passed without a prefix, it will be expanded
+     * to include the prefix one is supplied or the event target
+     * is configured with a default prefix.
+     * @method parseType
+     * @param {string} type the type
+     * @param {string} [pre=this._yuievt.config.prefix] the prefix
+     * @since 3.3.0
+     * @return {Array} an array containing:
+     *  * the detach category, if supplied,
+     *  * the prefixed event type,
+     *  * whether or not this is an after listener,
+     *  * the supplied event type
+     */
+    parseType: function(type, pre) {
+        return _parseType(type, pre || this._yuievt.config.prefix);
     },
 
     /**
@@ -2102,33 +2132,33 @@ Y.extend(Y.EventFacade, Object, {
 });
 
 CEProto.fireComplex = function(args) {
-    var es = Y.Env._eventstack, ef, q, queue, ce, ret, events, subs,
+
+    var es, ef, q, queue, ce, ret, events, subs, postponed,
         self = this, host = self.host || self, next, oldbubble;
 
-    if (es) {
+    if (self.stack) {
         // queue this event if the current item in the queue bubbles
-        if (self.queuable && self.type != es.next.type) {
+        if (self.queuable && self.type != self.stack.next.type) {
             self.log('queue ' + self.type);
-            es.queue.push([self, args]);
+            self.stack.queue.push([self, args]);
             return true;
         }
-    } else {
-        Y.Env._eventstack = {
-           // id of the first event in the stack
-           id: self.id,
-           next: self,
-           silent: self.silent,
-           stopped: 0,
-           prevented: 0,
-           bubbling: null,
-           type: self.type,
-           // defaultFnQueue: new Y.Queue(),
-           afterQueue: new Y.Queue(),
-           defaultTargetOnly: self.defaultTargetOnly,
-           queue: []
-        };
-        es = Y.Env._eventstack;
     }
+
+    es = self.stack || {
+       // id of the first event in the stack
+       id: self.id,
+       next: self,
+       silent: self.silent,
+       stopped: 0,
+       prevented: 0,
+       bubbling: null,
+       type: self.type,
+       // defaultFnQueue: new Y.Queue(),
+       afterQueue: new Y.Queue(),
+       defaultTargetOnly: self.defaultTargetOnly,
+       queue: []
+    };
 
     subs = self.getSubs();
 
@@ -2189,7 +2219,7 @@ CEProto.fireComplex = function(args) {
             es.prevented = 0;
         }
 
-        ret = host.bubble(self);
+        ret = host.bubble(self, args, null, es);
 
         self.stopped = Math.max(self.stopped, es.stopped);
         self.prevented = Math.max(self.prevented, es.prevented);
@@ -2218,16 +2248,21 @@ CEProto.fireComplex = function(args) {
                 next();
             }
         } else {
+            postponed = subs[1];
+            if (es.execDefaultCnt) {
+                postponed = Y.merge(postponed);
+                Y.each(postponed, function(s) {
+                    s.postponed = true;
+                });
+            }
+
             es.afterQueue.add(function() {
-                self._procSubs(subs[1], args, ef);
+                self._procSubs(postponed, args, ef);
             });
         }
     }
 
     self.target = null;
-
-    // es.stopped = 0;
-    // es.prevented = 0;
 
     if (es.id === self.id) {
         queue = es.queue;
@@ -2238,11 +2273,9 @@ CEProto.fireComplex = function(args) {
             // set up stack to allow the next item to be processed
             es.next = ce;
             ce.fire.apply(ce, q[1]);
-            // es.stopped = 0;
-            // es.prevented = 0;
         }
 
-        Y.Env._eventstack = null;
+        self.stack = null;
     }
 
     ret = !(self.stopped);
@@ -2311,7 +2344,9 @@ CEProto._getFacade = function() {
  */
 CEProto.stopPropagation = function() {
     this.stopped = 1;
-    Y.Env._eventstack.stopped = 1;
+    if (this.stack) {
+        this.stack.stopped = 1;
+    }
     this.events.fire('stopped', this);
 };
 
@@ -2322,7 +2357,9 @@ CEProto.stopPropagation = function() {
  */
 CEProto.stopImmediatePropagation = function() {
     this.stopped = 2;
-    Y.Env._eventstack.stopped = 2;
+    if (this.stack) {
+        this.stack.stopped = 2;
+    }
     this.events.fire('stopped', this);
 };
 
@@ -2333,7 +2370,9 @@ CEProto.stopImmediatePropagation = function() {
 CEProto.preventDefault = function() {
     if (this.preventable) {
         this.prevented = 1;
-        Y.Env._eventstack.prevented = 1;
+        if (this.stack) {
+            this.stack.prevented = 1;
+        }
         this.events.fire('prevented', this);
     }
 };
@@ -2398,12 +2437,12 @@ ETProto.removeTarget = function(o) {
  * @return {boolean} the aggregated return value from Event.Custom.fire
  * @for EventTarget
  */
-ETProto.bubble = function(evt, args, target) {
+ETProto.bubble = function(evt, args, target, es) {
 
     var targs = this._yuievt.targets, ret = true,
         t, type = evt && evt.type, ce, i, bc, ce2,
         originalTarget = target || (evt && evt.target) || this,
-        es = Y.Env._eventstack, oldbubble;
+        oldbubble;
 
     if (!evt || ((!evt.stopped) && targs)) {
 
@@ -2424,7 +2463,7 @@ ETProto.bubble = function(evt, args, target) {
                 // continue propagating the event.
                 if (!ce) {
                     if (t._yuievt.hasTargets) {
-                        t.bubble(evt, args, originalTarget);
+                        t.bubble(evt, args, originalTarget, es);
                     }
                 } else {
 
@@ -2441,6 +2480,8 @@ ETProto.bubble = function(evt, args, target) {
                     // default publish may not have emitFacade true -- that
                     // shouldn't be what the implementer meant to do
                     ce.emitFacade = true;
+
+                    ce.stack = es;
 
                     ret = ret && ce.fire.apply(ce, args || evt.details || []);
                     ce.broadcast = bc;

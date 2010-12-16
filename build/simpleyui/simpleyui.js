@@ -529,7 +529,6 @@ proto = {
                         }
                     }
 
-
                     if (use) {
                         for (j = 0; j < use.length; j++) {
                             if (!done[use[j]]) {
@@ -1574,7 +1573,11 @@ SUBREGEX = /\{\s*([^\|\}]+?)\s*(?:\|([^\}]*))?\s*\}/g;
  * @param o The object to test.
  * @return {boolean} true if o is an array.
  */
-L.isArray = Array.isArray || function(o) {
+// L.isArray = Array.isArray || function(o) {
+//     return L.type(o) === ARRAY;
+// };
+
+L.isArray = function(o) {
     return L.type(o) === ARRAY;
 };
 
@@ -1717,7 +1720,7 @@ L.trim = STRING_PROTO.trim ? function(s) {
 L.trimLeft = STRING_PROTO.trimLeft ? function (s) {
     return s.trimLeft();
 } : function (s) {
-    return s.replace(/^s+/, '');
+    return s.replace(/^\s+/, '');
 };
 
 /**
@@ -1730,7 +1733,7 @@ L.trimLeft = STRING_PROTO.trimLeft ? function (s) {
 L.trimRight = STRING_PROTO.trimRight ? function (s) {
     return s.trimRight();
 } : function (s) {
-    return s.replace(/s+$/, '');
+    return s.replace(/\s+$/, '');
 };
 
 /**
@@ -2079,9 +2082,7 @@ Queue.prototype = {
      * @return {object} this queue.
      */
     add: function() {
-        Y.Array.each(Y.Array(arguments, 0, true), function(fn) {
-            this._q.push(fn);
-        }, this);
+        this._q.push.apply(this._q, arguments);
 
         return this;
     },
@@ -2100,6 +2101,7 @@ Queue.prototype = {
 Y.Queue = Queue;
 
 YUI.Env._loaderQueue = YUI.Env._loaderQueue || new Queue();
+
 /**
  * The YUI module contains the components required for building the YUI
  * seed file.  This includes the script loading mechanism, a simple queue,
@@ -2291,11 +2293,15 @@ Y.cached = function(source, cache, refetch) {
  */
 var F = function() {},
 
-O = Object.create || function(o) {
+// O = Object.create || function(o) {
+//     F.prototype = o;
+//     return new F();
+// },
+
+O = function(o) {
     F.prototype = o;
     return new F();
 },
-
 
 owns = function(o, k) {
     return o && o.hasOwnProperty && o.hasOwnProperty(k);
@@ -2339,7 +2345,11 @@ Y.Object = O;
  * @param o an object.
  * @return {string[]} the keys.
  */
-O.keys = Object.keys || function(o) {
+// O.keys = Object.keys || function(o) {
+//     return _extract(o);
+// };
+
+O.keys = function(o) {
     return _extract(o);
 };
 
@@ -2350,7 +2360,11 @@ O.keys = Object.keys || function(o) {
  * @param o an object.
  * @return {Array} the values.
  */
-O.values = Object.values || function(o) {
+// O.values = Object.values || function(o) {
+//     return _extract(o, 1);
+// };
+
+O.values = function(o) {
     return _extract(o, 1);
 };
 
@@ -2530,7 +2544,6 @@ O.isEmpty = function(o) {
     }
     return true;
 };
-
 /**
  * The YUI module contains the components required for building the YUI seed
  * file.  This includes the script loading mechanism, a simple queue, and the
@@ -2552,8 +2565,15 @@ O.isEmpty = function(o) {
  * @class UA
  * @static
  */
-Y.UA = YUI.Env.UA || function() {
-
+/**
+* Static method for parsing the UA string. Defaults to assigning it's value to Y.UA
+* @static
+* @method Env.parseUA
+* @param {String} subUA Parse this UA string instead of navigator.userAgent
+* @returns {Object} The Y.UA object
+*/
+YUI.Env.parseUA = function(subUA) {
+    
     var numberify = function(s) {
             var c = 0;
             return parseFloat(s.replace(/\./g, function() {
@@ -2689,6 +2709,13 @@ Y.UA = YUI.Env.UA || function() {
          * @static
          */
         android: 0,
+        /**
+         * Detects Palms WebOS version
+         * @property webos
+         * @type float
+         * @static
+         */
+        webos: 0,
 
         /**
          * Google Caja version number or 0.
@@ -2715,7 +2742,7 @@ Y.UA = YUI.Env.UA || function() {
 
     },
 
-    ua = nav && nav.userAgent,
+    ua = subUA || nav && nav.userAgent,
 
     loc = win && win.location,
 
@@ -2752,15 +2779,25 @@ Y.UA = YUI.Env.UA || function() {
                 if (m && m[1]) {
                     m = numberify(m[1].replace('_', '.'));
                 }
-                o.ipad = (navigator.platform == 'iPad') ? m : 0;
-                o.ipod = (navigator.platform == 'iPod') ? m : 0;
-                o.iphone = (navigator.platform == 'iPhone') ? m : 0;
-                o.ios = o.ipad || o.iphone || o.ipod;
+                o.ios = m;
+                o.ipad = o.ipod = o.iphone = 0;
+
+                m = ua.match(/iPad|iPod|iPhone/);
+                if (m && m[0]) {
+                    o[m[0].toLowerCase()] = o.ios;
+                }
             } else {
                 m = ua.match(/NokiaN[^\/]*|Android \d\.\d|webOS\/\d\.\d/);
                 if (m) {
                     // Nokia N-series, Android, webOS, ex: NokiaN95
                     o.mobile = m[0];
+                }
+                if (/webOS/.test(ua)) {
+                    o.mobile = 'WebOS';
+                    m = ua.match(/webOS\/([^\s]*);/);
+                    if (m && m[1]) {
+                        o.webos = numberify(m[1]);
+                    }
                 }
                 if (/ Android/.test(ua)) {
                     o.mobile = 'Android';
@@ -2813,7 +2850,10 @@ Y.UA = YUI.Env.UA || function() {
     YUI.Env.UA = o;
 
     return o;
-}();
+};
+
+
+Y.UA = YUI.Env.UA || YUI.Env.parseUA();
 
 
 }, '@VERSION@' );
@@ -3598,7 +3638,7 @@ Y.mix(Y.namespace('Features'), {
     },
 
     test: function(cat, name, args) {
-
+        args = args || [];
         var result, ua, test,
             cat_o = feature_tests[cat],
             feature = cat_o && cat_o[name];
@@ -3634,13 +3674,8 @@ Y.mix(Y.namespace('Features'), {
 
 /* This file is auto-generated by src/loader/meta_join.py */
 var add = Y.Features.add;
-// 0
-add('load', '0', {
-    "trigger": "widget-base", 
-    "ua": "ie"
-});
 // autocomplete-list-keys-sniff.js
-add('load', '1', {
+add('load', '0', {
     "test": function (Y) {
     // Only add keyboard support to autocomplete-list if this doesn't appear to
     // be an iOS or Android-based mobile device.
@@ -3657,8 +3692,58 @@ add('load', '1', {
 }, 
     "trigger": "autocomplete-list"
 });
-// history-hash-ie-test.js
+// ie-style-test.js
+add('load', '1', {
+    "test": function (Y) {
+
+    var testFeature = Y.Features.test,
+        addFeature = Y.Features.add,
+        WINDOW = Y.config.win,
+        DOCUMENT = Y.config.doc,
+        DOCUMENT_ELEMENT = 'documentElement',
+        ret = false;
+
+    addFeature('style', 'computedStyle', {
+        test: function() {
+            return WINDOW && 'getComputedStyle' in WINDOW;
+        }
+    });
+
+    addFeature('style', 'opacity', {
+        test: function() {
+            return DOCUMENT && 'opacity' in DOCUMENT[DOCUMENT_ELEMENT].style;
+        }
+    });
+
+    ret =  (!testFeature('style', 'opacity') &&
+            !testFeature('style', 'computedStyle'));
+
+    return ret;
+}, 
+    "trigger": "dom-style"
+});
+// 0
 add('load', '2', {
+    "trigger": "widget-base", 
+    "ua": "ie"
+});
+// ie-base-test.js
+add('load', '3', {
+    "test": function(Y) {
+    var imp = Y.config.doc && Y.config.doc.implementation;
+    return (imp && (!imp.hasFeature('Events', '2.0')));
+}, 
+    "trigger": "node-base"
+});
+// dd-gestures-test.js
+add('load', '4', {
+    "test": function(Y) {
+    return (Y.config.win && ('ontouchstart' in Y.config.win && !Y.UA.chrome));
+}, 
+    "trigger": "dd-drag"
+});
+// history-hash-ie-test.js
+add('load', '5', {
     "test": function (Y) {
     var docMode = Y.config.doc.documentMode;
 
@@ -3666,13 +3751,6 @@ add('load', '2', {
             !docMode || docMode < 8);
 }, 
     "trigger": "history-hash"
-});
-// dd-gestures-test.js
-add('load', '3', {
-    "test": function(Y) {
-    return (Y.config.win && ('ontouchstart' in Y.config.win && !Y.UA.chrome));
-}, 
-    "trigger": "dd-drag"
 });
 
 
@@ -4332,7 +4410,7 @@ YUI.add('oop', function(Y) {
         // #2528250 don't try to clone element properties
         if (!o.addEventListener && !o.attachEvent) {
             yeach(o, function(v, k) {
-                if ((k || k === 0) && (!f || (f.call(c || this, v, k, this, o) !== false))) {
+if ((k || k === 0) && (!f || (f.call(c || this, v, k, this, o) !== false))) {
                     if (k !== CLONE_MARKER) {
                         if (k == 'prototype') {
                             // skip the prototype
@@ -4349,8 +4427,14 @@ YUI.add('oop', function(Y) {
 
         if (!cloned) {
             Y.Object.each(marked, function(v, k) {
-                delete v[CLONE_MARKER];
-            });
+                if (v[CLONE_MARKER]) {
+                    try {
+                        delete v[CLONE_MARKER];
+                    } catch (e) {
+                        v[CLONE_MARKER] = null;
+                    }
+                }
+            }, this);
             marked = null;
         }
 
@@ -4441,11 +4525,27 @@ var NODE_TYPE = 'nodeType',
     CONTAINS = 'contains',
     COMPARE_DOCUMENT_POSITION = 'compareDocumentPosition',
     EMPTY_STRING = '',
+    EMPTY_ARRAY = [],
 
     documentElement = Y.config.doc.documentElement,
 
     re_tag = /<([a-z]+)/i,
 
+    createFromDIV = function(html, tag) {
+        var div = Y.config.doc.createElement('div'),
+            ret = true;
+
+        div.innerHTML = html;
+        if (!div.firstChild || div.firstChild.tagName !== tag.toUpperCase()) {
+            ret = false;
+        }
+
+        return ret;
+    },
+
+    addFeature = Y.Features.add,
+    testFeature = Y.Features.test,
+    
 Y_DOM = {
     /**
      * Returns the HTMLElement with the given ID (Wrapper for document.getElementById).
@@ -4628,15 +4728,28 @@ Y_DOM = {
             ret = root.querySelectorAll('[id="' + id + '"]');
         } else if (root.all) {
             nodes = root.all(id);
-            if (nodes && nodes.nodeType) { // root.all may return one or many
-                nodes = [nodes];
-            }
 
-            if (nodes && nodes.length) {
-                for (i = 0; node = nodes[i++];) { // check for a match
-                    if (node.attributes && node.attributes.id
-                            && node.attributes.id.value === id) { // avoid false positive for node.name & form.id
-                        ret.push(node);
+            if (nodes) {
+                // root.all may return HTMLElement or HTMLCollection.
+                // some elements are also HTMLCollection (FORM, SELECT).
+                if (nodes.nodeName) {
+                    if (nodes.id === id) { // avoid false positive on name
+                        ret.push(nodes);
+                        nodes = EMPTY_ARRAY; // done, no need to filter
+                    } else { //  prep for filtering
+                        nodes = [nodes];
+                    }
+                }
+
+                if (nodes.length) {
+                    // filter out matches on node.name
+                    // and element.id as reference to element with id === 'id'
+                    for (i = 0; node = nodes[i++];) {
+                        if (node.id === id  || 
+                                (node.attributes && node.attributes.id &&
+                                node.attributes.id.value === id)) { 
+                            ret.push(node);
+                        }
                     }
                 }
             }
@@ -4667,14 +4780,16 @@ Y_DOM = {
             create = Y_DOM._create,
             custom = Y_DOM.creators,
             ret = null,
+            creator,
             tag, nodes;
 
         if (html != undefined) { // not undefined or null
-            if (m && custom[m[1]]) {
-                if (typeof custom[m[1]] === 'function') {
-                    create = custom[m[1]];
+            if (m && m[1]) {
+                creator = custom[m[1].toLowerCase()];
+                if (typeof creator === 'function') {
+                    create = creator; 
                 } else {
-                    tag = custom[m[1]];
+                    tag = creator;
                 }
             }
 
@@ -4728,7 +4843,7 @@ Y_DOM = {
     /**
      * Provides a normalized attribute interface. 
      * @method setAttibute
-     * @param {String | HTMLElement} el The target element for the attribute.
+     * @param {HTMLElement} el The target element for the attribute.
      * @param {String} attr The attribute to set.
      * @param {String} val The value of the attribute.
      */
@@ -4743,7 +4858,7 @@ Y_DOM = {
     /**
      * Provides a normalized attribute interface. 
      * @method getAttibute
-     * @param {String | HTMLElement} el The target element for the attribute.
+     * @param {HTMLElement} el The target element for the attribute.
      * @param {String} attr The attribute to get.
      * @return {String} The current value of the attribute. 
      */
@@ -4790,8 +4905,8 @@ Y_DOM = {
      * Inserts content in a node at the given location 
      * @method addHTML
      * @param {HTMLElement} node The node to insert into
-     * @param {String | HTMLElement | Array | HTMLCollection} content The content to be inserted 
-     * @param {String | HTMLElement} where Where to insert the content
+     * @param {HTMLElement | Array | HTMLCollection} content The content to be inserted 
+     * @param {HTMLElement} where Where to insert the content
      * If no "where" is given, content is appended to the node
      * Possible values for "where"
      * <dl>
@@ -5049,9 +5164,52 @@ Y_DOM = {
         }
     },
 
+    generateID: function(el) {
+        var id = el.id;
+
+        if (!id) {
+            id = Y.stamp(el);
+            el.id = id; 
+        }   
+
+        return id; 
+    },
+
     creators: {}
 };
 
+addFeature('innerhtml', 'table', {
+    test: function() {
+        var node = Y.config.doc.createElement('table');
+        try {
+            node.innerHTML = '<tbody></tbody>';
+        } catch(e) {
+            return false;
+        }
+        return (node.firstChild && node.firstChild.nodeName === 'TBODY');
+    }
+});
+
+addFeature('innerhtml-div', 'tr', {
+    test: function() {
+        return createFromDIV('<tr></tr>', 'tr');
+    }
+});
+
+addFeature('innerhtml-div', 'script', {
+    test: function() {
+        return createFromDIV('<script></script>', 'script');
+    }
+});
+
+addFeature('value-set', 'select', {
+    test: function() {
+        var node = Y.config.doc.createElement('select');
+        node.innerHTML = '<option>1</option><option>2</option>';
+        node.value = '2';
+        return (node.value && node.value === '2');
+    }
+});
 
 (function(Y) {
     var creators = Y_DOM.creators,
@@ -5061,63 +5219,67 @@ Y_DOM = {
         TABLE_OPEN = '<table>',
         TABLE_CLOSE = '</table>';
 
-    if (Y.UA.ie) {
-        Y.mix(creators, {
+    if (!testFeature('innerhtml', 'table')) {
         // TODO: thead/tfoot with nested tbody
             // IE adds TBODY when creating TABLE elements (which may share this impl)
-            tbody: function(html, doc) {
-                var frag = create(TABLE_OPEN + html + TABLE_CLOSE, doc),
-                    tb = frag.children.tags('tbody')[0];
+        creators.tbody = function(html, doc) {
+            var frag = create(TABLE_OPEN + html + TABLE_CLOSE, doc),
+                tb = frag.children.tags('tbody')[0];
 
-                if (frag.children.length > 1 && tb && !re_tbody.test(html)) {
-                    tb[PARENT_NODE].removeChild(tb); // strip extraneous tbody
-                }
-                return frag;
-            },
-
-            script: function(html, doc) {
-                var frag = doc.createElement('div');
-
-                frag.innerHTML = '-' + html;
-                frag.removeChild(frag[FIRST_CHILD]);
-                return frag;
+            if (frag.children.length > 1 && tb && !re_tbody.test(html)) {
+                tb[PARENT_NODE].removeChild(tb); // strip extraneous tbody
             }
-
-        }, true);
-
-        Y.mix(Y_DOM.VALUE_GETTERS, {
-            button: function(node) {
-                return (node.attributes && node.attributes.value) ? node.attributes.value.value : '';
-            }
-        });
-
-        Y.mix(Y_DOM.VALUE_SETTERS, {
-            // IE: node.value changes the button text, which should be handled via innerHTML
-            button: function(node, val) {
-                var attr = node.attributes.value;
-                if (!attr) {
-                    attr = node[OWNER_DOCUMENT].createAttribute('value');
-                    node.setAttributeNode(attr);
-                }
-
-                attr.value = val;
-            },
-
-            select: function(node, val) {
-                for (var i = 0, options = node.getElementsByTagName('option'), option;
-                        option = options[i++];) {
-                    if (Y_DOM.getValue(option) === val) {
-                        Y_DOM.setAttribute(option, 'selected', true);
-                        break;
-                    }
-                }
-            }
-        });
-
-        Y_DOM.creators.col = Y_DOM.creators.link = Y_DOM.creators.style = Y_DOM.creators.script;
+            return frag;
+        };
     }
 
-    if (Y.UA.gecko || Y.UA.ie) {
+    if (!testFeature('innerhtml-div', 'script')) {
+        creators.script = function(html, doc) {
+            var frag = doc.createElement('div');
+
+            frag.innerHTML = '-' + html;
+            frag.removeChild(frag[FIRST_CHILD]);
+            return frag;
+        }
+
+        Y_DOM.creators.link = Y_DOM.creators.style = Y_DOM.creators.script;
+    }
+
+    
+    if (!testFeature('value-set', 'select')) {
+        Y_DOM.VALUE_SETTERS.select = function(node, val) {
+            for (var i = 0, options = node.getElementsByTagName('option'), option;
+                    option = options[i++];) {
+                if (Y_DOM.getValue(option) === val) {
+                    option.selected = true;
+                    //Y_DOM.setAttribute(option, 'selected', 'selected');
+                    break;
+                }
+            }
+        }
+    }
+
+    Y.mix(Y_DOM.VALUE_GETTERS, {
+        button: function(node) {
+            return (node.attributes && node.attributes.value) ? node.attributes.value.value : '';
+        }
+    });
+
+    Y.mix(Y_DOM.VALUE_SETTERS, {
+        // IE: node.value changes the button text, which should be handled via innerHTML
+        button: function(node, val) {
+            var attr = node.attributes.value;
+            if (!attr) {
+                attr = node[OWNER_DOCUMENT].createAttribute('value');
+                node.setAttributeNode(attr);
+            }
+
+            attr.value = val;
+        }
+    });
+
+
+    if (!testFeature('innerhtml-div', 'tr')) {
         Y.mix(creators, {
             option: function(html, doc) {
                 return create('<select><option class="yui3-big-dummy" selected></option>' + html + '</select>', doc);
@@ -5131,9 +5293,11 @@ Y_DOM = {
                 return create('<tr>' + html + '</tr>', doc);
             }, 
 
-            tbody: function(html, doc) {
-                return create(TABLE_OPEN + html + TABLE_CLOSE, doc);
-            }
+            col: function(html, doc) {
+                return create('<colgroup>' + html + '</colgroup>', doc);
+            }, 
+
+            tbody: 'table'
         });
 
         Y.mix(creators, {
@@ -5143,7 +5307,6 @@ Y_DOM = {
             tfoot: creators.tbody,
             caption: creators.tbody,
             colgroup: creators.tbody,
-            col: creators.tbody,
             optgroup: creators.option
         });
     }
@@ -5158,7 +5321,7 @@ Y_DOM = {
             var val = node.value,
                 options = node.options;
 
-            if (options && options.length && val === '') {
+            if (options && options.length) {
                 // TODO: implement multipe select
                 if (node.multiple) {
                 } else {
@@ -5326,6 +5489,7 @@ var DOCUMENT_ELEMENT = 'documentElement',
     GET_COMPUTED_STYLE = 'getComputedStyle',
     GET_BOUNDING_CLIENT_RECT = 'getBoundingClientRect',
 
+    WINDOW = Y.config.win,
     DOCUMENT = Y.config.doc,
     UNDEFINED = undefined,
 
@@ -5340,7 +5504,6 @@ var DOCUMENT_ELEMENT = 'documentElement',
 
     re_color = /color$/i,
     re_unit = /width|height|top|left|right|bottom|margin|padding/i;
-
 
 Y.Array.each(VENDOR_TRANSFORM, function(val) {
     if (val in DOCUMENT[DOCUMENT_ELEMENT].style) {
@@ -5364,8 +5527,7 @@ Y.mix(Y_DOM, {
      */
     setStyle: function(node, att, val, style) {
         style = style || node.style;
-        var CUSTOM_STYLES = Y_DOM.CUSTOM_STYLES,
-            current;
+        var CUSTOM_STYLES = Y_DOM.CUSTOM_STYLES;
 
         if (style) {
             if (val === null || val === '') { // normalize unsetting
@@ -5381,6 +5543,9 @@ Y.mix(Y_DOM, {
                 } else if (typeof CUSTOM_STYLES[att] === 'string') {
                     att = CUSTOM_STYLES[att];
                 }
+            } else if (att === '') { // unset inline styles
+                att = 'cssText';
+                val = '';
             }
             style[att] = val; 
         }
@@ -5546,6 +5711,8 @@ Y_DOM.CUSTOM_STYLES.transform = {
         return Y_DOM[GET_COMPUTED_STYLE](node, TRANSFORM);
     }
 };
+
+
 })(Y);
 (function(Y) {
 var PARSE_INT = parseInt,
@@ -7935,8 +8102,9 @@ Y.CustomEvent.prototype = {
         }
 
         if (s) {
-            delete s.fn;
-            delete s.context;
+            // delete s.fn;
+            // delete s.context;
+            s.deleted = true;
         }
     }
 };
@@ -8001,6 +8169,15 @@ Y.Subscriber = function(fn, context, args) {
 Y.Subscriber.prototype = {
 
     _notify: function(c, args, ce) {
+        if (this.deleted && !this.postponed) {
+            if (this.postponed) {
+                delete this.fn;
+                delete this.context;
+            } else {
+                delete this.postponed;
+                return null;
+            }
+        }
         var a = this.args, ret;
         switch (ce.signature) {
             case 0:
@@ -8218,6 +8395,26 @@ ET.prototype = {
             }
         });
         return handle;
+    },
+
+    /**
+     * Takes the type parameter passed to 'on' and parses out the
+     * various pieces that could be included in the type.  If the
+     * event type is passed without a prefix, it will be expanded
+     * to include the prefix one is supplied or the event target
+     * is configured with a default prefix.
+     * @method parseType
+     * @param {string} type the type
+     * @param {string} [pre=this._yuievt.config.prefix] the prefix
+     * @since 3.3.0
+     * @return {Array} an array containing:
+     *  * the detach category, if supplied,
+     *  * the prefixed event type,
+     *  * whether or not this is an after listener,
+     *  * the supplied event type
+     */
+    parseType: function(type, pre) {
+        return _parseType(type, pre || this._yuievt.config.prefix);
     },
 
     /**
@@ -9068,7 +9265,8 @@ Y.extend(DOMEventFacade, Object, {
         this.keyCode = c;
         this.charCode = c;
         this.which = e.which || e.charCode || c;
-        this.button = e.button;
+        // this.button = e.button;
+        this.button = this.which;
 
         this.target = resolve(e.target);
         this.currentTarget = resolve(currentTarget);
@@ -9801,14 +9999,7 @@ Event._interval = setInterval(Event._poll, Event.POLL_INTERVAL);
          * @static
          */
         generateId: function(el) {
-            var id = el.id;
-
-            if (!id) {
-                id = Y.stamp(el);
-                el.id = id;
-            }
-
-            return id;
+            return Y.DOM.generateID(el);
         },
 
         /**
@@ -10174,6 +10365,149 @@ Y.Env.evt.plugins.contentready = {
 
 
 }, '@VERSION@' ,{requires:['event-custom-base']});
+(function() {
+
+var stateChangeListener,
+    GLOBAL_ENV   = YUI.Env,
+    config       = YUI.config,
+    doc          = config.doc,
+    docElement   = doc && doc.documentElement,
+    EVENT_NAME   = 'onreadystatechange',
+    pollInterval = config.pollInterval || 40;
+
+if (docElement.doScroll && !GLOBAL_ENV._ieready) {
+    GLOBAL_ENV._ieready = function() {
+        GLOBAL_ENV._ready();
+    };
+
+/*! DOMReady: based on work by: Dean Edwards/John Resig/Matthias Miller/Diego Perini */
+// Internet Explorer: use the doScroll() method on the root element.
+// This isolates what appears to be a safe moment to manipulate the
+// DOM prior to when the document's readyState suggests it is safe to do so.
+    if (self !== self.top) {
+        stateChangeListener = function() {
+            if (doc.readyState == 'complete') {
+                GLOBAL_ENV.remove(doc, EVENT_NAME, stateChangeListener);
+                GLOBAL_ENV.ieready();
+            }
+        };
+        GLOBAL_ENV.add(doc, EVENT_NAME, stateChangeListener);
+    } else {
+        GLOBAL_ENV._dri = setInterval(function() {
+            try {
+                docElement.doScroll('left');
+                clearInterval(GLOBAL_ENV._dri);
+                GLOBAL_ENV._dri = null;
+                GLOBAL_ENV._ieready();
+            } catch (domNotReady) { }
+        }, pollInterval);
+    }
+}
+
+})();
+YUI.add('event-base-ie', function(Y) {
+
+/*
+ * Custom event engine, DOM event listener abstraction layer, synthetic DOM
+ * events.
+ * @module event
+ * @submodule event-base
+ */
+
+var IEEventFacade = function() {
+        // IEEventFacade.superclass.constructor.apply(this, arguments);
+        Y.DOM2EventFacade.apply(this, arguments);
+    };
+
+Y.extend(IEEventFacade, Y.DOM2EventFacade, {
+
+    init: function() {
+
+        IEEventFacade.superclass.init.apply(this, arguments);
+
+        var e = this._event,
+            resolve = Y.DOM2EventFacade.resolve,
+            x, y, d, b, de, t;
+
+        this.target = resolve(e.srcElement);
+
+        if (('clientX' in e) && (!x) && (0 !== x)) {
+            x = e.clientX;
+            y = e.clientY;
+
+            d = Y.config.doc;
+            b = d.body;
+            de = d.documentElement;
+
+            x += (de.scrollLeft || (b && b.scrollLeft) || 0);
+            y += (de.scrollTop  || (b && b.scrollTop)  || 0);
+
+            this.pageX = x;
+            this.pageY = y;
+        }
+
+        if (e.type == "mouseout") {
+            t = e.toElement;
+        } else if (e.type == "mouseover") {
+            t = e.fromElement;
+        }
+
+        this.relatedTarget = resolve(t);
+
+        // which should contain the unicode key code if this is a key event
+        // if (e.charCode) {
+        //     this.which = e.charCode;
+        // }
+
+        // for click events, which is normalized for which mouse button was
+        // clicked.
+        if (e.button) {
+            switch (e.button) {
+                case 2:
+                    this.which = 3;
+                    break;
+                case 4:
+                    this.which = 2;
+                    break;
+                default:
+                    this.which = e.button;
+            }
+
+            this.button = this.which;
+        }
+
+    },
+
+    stopPropagation: function() {
+        var e = this._event;
+        e.cancelBubble = true;
+        this._wrapper.stopped = 1;
+        this.stopped = 1;
+    },
+
+    stopImmediatePropagation: function() {
+        this.stopPropagation();
+        this._wrapper.stopped = 2;
+        this.stopped = 2;
+    },
+
+    preventDefault: function(returnValue) {
+        this._event.returnValue = returnValue || false;
+        this._wrapper.prevented = 1;
+        this.prevented = 1;
+    }
+
+});
+
+var imp = Y.config.doc && Y.config.doc.implementation;
+
+if (imp && (!imp.hasFeature('Events', '2.0'))) {
+    Y.DOMEventFacade = IEEventFacade;
+}
+
+
+
+}, '@VERSION@' );
 YUI.add('pluginhost-base', function(Y) {
 
     /**
@@ -10617,6 +10951,7 @@ Y_Node.DOM_EVENTS = {
     mouseover: 1,
     mouseup: 1,
     mousewheel: 1,
+    orientationchange: 1,
     reset: 1,
     resize: 1,
     select: 1,
@@ -10792,15 +11127,18 @@ Y_Node.one = function(node) {
 };
 
 /**
- * Creates a new dom node using the provided markup string.
+ * Returns a new dom node using the provided markup string.
  * @method create
  * @static
  * @param {String} html The markup used to create the element
  * @param {HTMLDocument} doc An optional document context
  * @return {Node} A Node instance bound to a DOM node or fragment
  */
-Y_Node.create = function() {
-    return Y.one(Y_DOM.create.apply(Y_DOM, arguments));
+Y_Node.create = function(html, doc) {
+    if (doc && doc._node) {
+        doc = doc._node;
+    }
+    return Y.one(Y_DOM.create(html, doc));
 };
 
 /**
@@ -11017,7 +11355,7 @@ Y.mix(Y_Node.prototype, {
             this._setAttr.apply(this, arguments);
         } else { // use setters inline
             if (attrConfig && attrConfig.setter) {
-                attrConfig.setter.call(this, val);
+                attrConfig.setter.call(this, val, attr);
             } else if (Y_Node.re_aria.test(attr)) { // special case Aria
                 this._node.setAttribute(attr, val);
             } else {
@@ -11217,6 +11555,8 @@ Y.mix(Y_Node.prototype, {
      * Removes the node from its parent.
      * Shortcut for myNode.get('parentNode').removeChild(myNode);
      * @method remove
+     * @param {Boolean} destroy whether or not to call destroy() on the node
+     * after removal.
      * @chainable
      *
      */
@@ -11229,7 +11569,7 @@ Y.mix(Y_Node.prototype, {
         }
 
         if (destroy) {
-            this.destroy(true);
+            this.destroy();
         }
 
         return this;
@@ -11284,7 +11624,7 @@ Y.mix(Y_Node.prototype, {
      * @return {Node} The inserted node 
      */
     insertBefore: function(newNode, refNode) {
-        return Y.Node.scrubVal(this._insert(newNode, refNode, 'before'));
+        return Y.Node.scrubVal(this._insert(newNode, refNode));
     },
 
     /**
@@ -11308,18 +11648,23 @@ Y.mix(Y_Node.prototype, {
      * node's subtree (default is false)
      *
      */
-    destroy: function(recursivePurge) {
-        delete Y_Node._instances[this[UID]];
-        this.purge(recursivePurge);
+    destroy: function(recursive) {
+        this.purge(); // TODO: only remove events add via this Node
 
         if (this.unplug) { // may not be a PluginHost
             this.unplug();
         }
 
-        this._node._yuid = null;
+        this.clearData();
+
+        if (recursive) {
+            this.all('*').destroy();
+        }
+
         this._node = null;
         this._stateProxy = null;
-        this.clearData();
+
+        delete Y_Node._instances[this[UID]];
     },
 
     /**
@@ -11557,8 +11902,9 @@ Y.mix(Y_Node.prototype, {
      * @param {Function} callback An optional function to run after the transition completes. 
      * @chainable
      */
-    show: function(name, config, callback) {
-        this._show();
+    show: function(callback) {
+        callback = arguments[arguments.length - 1];
+        this.toggleView(true, callback);
         return this;
     },
 
@@ -11570,6 +11916,36 @@ Y.mix(Y_Node.prototype, {
      */
     _show: function() {
         this.setStyle('display', '');
+
+    },
+
+    _isHidden: function() {
+        return Y.DOM.getStyle(this._node, 'display') === 'none';
+    },
+
+    toggleView: function(on, callback) {
+        this._toggleView.apply(this, arguments);
+    },
+
+    _toggleView: function(on, callback) {
+        callback = arguments[arguments.length - 1];
+
+        // base on current state if not forcing 
+        if (typeof on != 'boolean') {
+            on = (this._isHidden()) ? 1 : 0;
+        }
+
+        if (on) {
+            this._show();
+        }  else {
+            this._hide();
+        }
+
+        if (typeof callback == 'function') {
+            callback.call(this);
+        }
+
+        return this;
     },
 
     /**
@@ -11583,8 +11959,9 @@ Y.mix(Y_Node.prototype, {
      * @param {Function} callback An optional function to run after the transition completes. 
      * @chainable
      */
-    hide: function(name, config, callback) {
-        this._hide();
+    hide: function(callback) {
+        callback = arguments[arguments.length - 1];
+        this.toggleView(false, callback);
         return this;
     },
 
@@ -11917,6 +12294,9 @@ Y.mix(NodeList.prototype, {
      * @param {Function} fn The handler to call when the event fires
      * @param {Object} context The context to call the handler with.
      * Default is the NodeList instance.
+     * @param {Object} context The context to call the handler with.
+     * param {mixed} arg* 0..n additional arguments to supply to the subscriber
+     * when the event fires.
      * @return {Object} Returns an event handle that can later be use to detach().
      * @see Event.on
      */
@@ -12060,7 +12440,35 @@ NodeList.importMethod(Y.Node.prototype, [
       * @method setContent
       * @see Node.setContent
       */
-    'setContent'
+    'setContent',
+
+    /**
+     * Makes each node visible.
+     * If the "transition" module is loaded, show optionally
+     * animates the showing of the node using either the default
+     * transition effect ('fadeIn'), or the given named effect.
+     * @method show
+     * @param {String} name A named Transition effect to use as the show effect. 
+     * @param {Object} config Options to use with the transition. 
+     * @param {Function} callback An optional function to run after the transition completes. 
+     * @chainable
+     */
+    'show',
+
+    /**
+     * Hides each node.
+     * If the "transition" module is loaded, hide optionally
+     * animates the hiding of the node using either the default
+     * transition effect ('fadeOut'), or the given named effect.
+     * @method hide
+     * @param {String} name A named Transition effect to use as the show effect. 
+     * @param {Object} config Options to use with the transition. 
+     * @param {Function} callback An optional function to run after the transition completes. 
+     * @chainable
+     */
+    'hide',
+
+    'toggleView'
 ]);
 
 // one-off implementation to convert array of Nodes to NodeList
@@ -12263,7 +12671,14 @@ Y.Node.importMethod(Y.DOM, [
      * @method unwrap
      * @chainable
      */
-    'unwrap'
+    'unwrap',
+
+    /**
+     * Applies a unique ID to the node if none exists
+     * @method generateID
+     * @return {String} The existing or generated ID
+     */
+    'generateID'
 ]);
 
 Y.NodeList.importMethod(Y.Node.prototype, [
@@ -12311,7 +12726,14 @@ Y.NodeList.importMethod(Y.Node.prototype, [
  * @param {String} html The markup to wrap around the node. 
  * @chainable
  */
-    'wrap'
+    'wrap',
+
+/**
+ * Applies a unique ID to each node if none exists
+ * @method generateID
+ * @return {String} The existing or generated ID
+ */
+    'generateID'
 ]);
 (function(Y) {
     var methods = [
@@ -12320,7 +12742,7 @@ Y.NodeList.importMethod(Y.Node.prototype, [
      * @method hasClass
      * @for Node
      * @param {String} className the class name to search for
-     * @return {Array} An array of booleans for each node bound to the NodeList. 
+     * @return {Boolean} Whether or not the element has the specified class 
      */
      'hasClass',
 
@@ -12354,6 +12776,7 @@ Y.NodeList.importMethod(Y.Node.prototype, [
      * If the className exists on the node it is removed, if it doesn't exist it is added.
      * @method toggleClass  
      * @param {String} className the class name to be toggled
+     * @param {Boolean} force Option to force adding or removing the class. 
      * @chainable
      */
      'toggleClass'
@@ -13002,7 +13425,7 @@ Y.Node.prototype.delegate = function(type) {
 }, '@VERSION@' ,{requires:['node-base', 'event-delegate']});
 
 
-YUI.add('node', function(Y){}, '@VERSION@' ,{requires:['dom', 'event-base', 'event-delegate', 'pluginhost'], use:['node-base', 'node-style', 'node-screen', 'node-pluginhost', 'node-event-delegate'], skinnable:false});
+YUI.add('node', function(Y){}, '@VERSION@' ,{skinnable:false, requires:['dom', 'event-base', 'event-delegate', 'pluginhost'], use:['node-base', 'node-style', 'node-screen', 'node-pluginhost', 'node-event-delegate']});
 
 YUI.add('event-delegate', function(Y) {
 
@@ -13491,12 +13914,15 @@ YUI.add('io-base', function(Y) {
 
 
     function _destroy(o) {
-        // IE, when using XMLHttpRequest as an ActiveX Object, will throw
-        // a "Type Mismatch" error if the event handler is set to "null".
-        if (w && w.XMLHttpRequest) {
-            if (o.c) {
+        if (w) {
+            if (o.c && w.XMLHttpRequest) {
                 o.c.onreadystatechange = null;
             }
+			else if (Y.UA.ie === 6 && !o.t) {
+				// IE, when using XMLHttpRequest as an ActiveX Object, will throw
+				// a "Type Mismatch" error if the event handler is set to "null".
+				o.c.abort();
+			}
         }
 
         o.c = null;
@@ -13755,14 +14181,19 @@ YUI.add('io-base', function(Y) {
 
         for (p in _headers) {
             if (_headers.hasOwnProperty(p)) {
+				/*
                 if (h[p]) {
-                    // Configuration headers will supersede io preset headers,
+                    // Configuration headers will supersede preset io headers,
                     // if headers match.
                     continue;
                 }
                 else {
                     h[p] = _headers[p];
                 }
+				*/
+				if (!h[p]) {
+					h[p] = _headers[p];
+				}
             }
         }
 
@@ -14359,7 +14790,7 @@ YUI.add('transition-native', function(Y) {
 * Transition has no API of its own, but adds the transition method to Node.
 *
 * @module transition
-* @requires node
+* @requires node-style
 */
 
 var TRANSITION = '-webkit-transition',
@@ -14370,6 +14801,7 @@ var TRANSITION = '-webkit-transition',
     TRANSITION_TIMING_FUNCTION = '-webkit-transition-timing-function',
     TRANSITION_DELAY = '-webkit-transition-delay',
     TRANSITION_END = 'webkitTransitionEnd',
+    ON_TRANSITION_END = 'onwebkittransitionend',
     TRANSFORM_CAMEL = 'WebkitTransform',
 
     EMPTY_OBJ = {},
@@ -14464,7 +14896,11 @@ Transition.prototype = {
         var anim = this,
             node = this._node,
             uid = Y.stamp(node),
+            nodeInstance = Y.one(node),
             attrs = Transition._nodeAttrs[uid],
+            computed,
+            compareVal,
+            dur,
             attr,
             val;
 
@@ -14483,7 +14919,7 @@ Transition.prototype = {
         }
 
         if (typeof val === 'function') {
-            val = val.call(node, node);
+            val = val.call(nodeInstance, nodeInstance);
         }
 
         if (attr && attr.transition) {
@@ -14491,35 +14927,39 @@ Transition.prototype = {
             if (attr.transition !== anim) {
                 attr.transition._count--; // remapping attr to this transition
             }
-        } /* else {
-            // when size is auto or % webkit starts from zero instead of computed 
-            // (https://bugs.webkit.org/show_bug.cgi?id=16020)
-            // workaround by setting to current value
-            // TODO: move to run
-            if (prop == 'height' || prop == 'width') {
-                // avoid setting if already set or transitioning
-                // TODO: handle inline percent / auto
-                if (!node._node.style[prop] && /(?:^|\s|;)prop(?:;|\s|$)/.test(
-                            node.getStyle(TRANSITION_PROPERTY_CAMEL))) {
-                    node.setStyle(prop, node.getComputedStyle(prop));
-                }
-            }
-        } */
+        } 
 
         anim._count++; // properties per transition
 
+        // make 0 async and fire events
+        dur = ((typeof config.duration != 'undefined') ? config.duration :
+                    anim._duration) || 0.0001;
+
         attrs[prop] = {
             value: val,
-            duration: ((typeof config.duration !== 'undefined') ? config.duration :
-                    anim._duration) || 0.0001, // make 0 async and fire events
-
-            delay: (typeof config.delay !== 'undefined') ? config.delay :
+            duration: dur,
+            delay: (typeof config.delay != 'undefined') ? config.delay :
                     anim._delay,
 
             easing: config.easing || anim._easing,
 
             transition: anim
         };
+
+        // native end event doesnt fire when setting to same value
+        // supplementing with timer
+        // val may be a string or number (height: 0, etc), but computedStyle is always string
+        computed = Y.DOM.getComputedStyle(node, prop);
+        compareVal = (typeof val === 'string') ? computed : parseFloat(computed);
+
+        if (Transition.useNative && compareVal === val) {
+            setTimeout(function() {
+                anim._onNativeEnd.call(node, {
+                    propertyName: prop,
+                    elapsedTime: dur
+                });
+            }, dur * 1000);
+        }
     },
 
     removeProperty: function(prop) {
@@ -14534,7 +14974,8 @@ Transition.prototype = {
     },
 
     initAttrs: function(config) {
-        var attr;
+        var attr,
+            node = this._node;
 
         if (config.transform && !config[TRANSFORM_CAMEL]) {
             config[TRANSFORM_CAMEL] = config.transform;
@@ -14544,8 +14985,14 @@ Transition.prototype = {
         for (attr in config) {
             if (config.hasOwnProperty(attr) && !Transition._reKeywords.test(attr)) {
                 this.addProperty(attr, config[attr]);
-            }
 
+                // when size is auto or % webkit starts from zero instead of computed 
+                // (https://bugs.webkit.org/show_bug.cgi?id=16020)
+                // TODO: selective set
+                if (node.style[attr] === '') {
+                    Y.DOM.setStyle(node, attr, Y.DOM.getComputedStyle(node, attr));
+                }
+            }
         }
     },
 
@@ -14571,7 +15018,7 @@ Transition.prototype = {
             //anim._node.fire('transition:start', data);
 
             if (config.on && config.on.start) {
-                config.on.start.call(node, data);
+                config.on.start.call(Y.one(node), data);
             }
 
             anim.initAttrs(anim._config);
@@ -14598,9 +15045,8 @@ Transition.prototype = {
         var anim = this,
             node = anim._node,
             uid = Y.stamp(node),
-            domNode = node._node,
-            style = domNode.style,
-            computed = getComputedStyle(domNode),
+            style = node.style,
+            computed = getComputedStyle(node),
             attrs = Transition._nodeAttrs[uid],
             cssText = '',
             cssTransition = computed[TRANSITION_PROPERTY],
@@ -14627,14 +15073,13 @@ Transition.prototype = {
             hyphy = Transition._toHyphen(name);
             attr = attrs[name];
             if (attrs.hasOwnProperty(name) && attr.transition === anim) {
-                if (name in domNode.style) { // only native styles allowed
+                if (name in node.style) { // only native styles allowed
                     duration += anim._prepDur(attr.duration) + ',';
                     delay += anim._prepDur(attr.delay) + ',';
                     easing += (attr.easing) + ',';
 
                     transitionText += hyphy + ',';
                     cssText += hyphy + ': ' + attr.value + '; ';
-
                 } else {
                     this.removeProperty(name);
                 }
@@ -14648,11 +15093,13 @@ Transition.prototype = {
 
         // only one native end event per node
         if (!Transition._hasEnd[uid]) {
-            anim._detach = node.on(TRANSITION_END, anim._onNativeEnd);
+            //anim._detach = Y.on(TRANSITION_END, anim._onNativeEnd, node);
+            //node[ON_TRANSITION_END] = anim._onNativeEnd;
+            node.addEventListener(TRANSITION_END, anim._onNativeEnd, false);
             Transition._hasEnd[uid] = true;
 
         }
-
+        
         //setTimeout(function() { // allow updates to apply (size fix, onstart, etc)
             style.cssText += transitionText + duration + easing + delay + cssText;
         //}, 1);
@@ -14668,45 +15115,49 @@ Transition.prototype = {
                 type: 'transition:end',
                 config: config,
                 elapsedTime: elapsed 
-            };
+            },
+
+            nodeInstance = Y.one(node); 
 
         anim._running = false;
         anim._callback = null;
 
-        if (config.on && config.on.end) {
-            setTimeout(function() { // IE: allow previous update to finish
-                config.on.end.call(node, data);
+        if (node) {
+            if (config.on && config.on.end) {
+                setTimeout(function() { // IE: allow previous update to finish
+                    config.on.end.call(nodeInstance, data);
 
-                // nested to ensure proper fire order
-                if (callback) {
-                    callback.call(node, data);
-                }
+                    // nested to ensure proper fire order
+                    if (callback) {
+                        callback.call(nodeInstance, data);
+                    }
 
-            }, 1);
-        } else if (callback) {
-            setTimeout(function() { // IE: allow previous update to finish
-                callback.call(node, data);
-            }, 1);
+                }, 1);
+            } else if (callback) {
+                setTimeout(function() { // IE: allow previous update to finish
+                    callback.call(nodeInstance, data);
+                }, 1);
+            }
+            //node.fire('transition:end', data);
         }
 
-        //node.fire('transition:end', data);
     },
 
     _endNative: function(name) {
         var node = this._node,
-            value = node.getComputedStyle(TRANSITION_PROPERTY);
+            value = node.ownerDocument.defaultView.getComputedStyle(node, '')[TRANSITION_PROPERTY];
 
         if (typeof value === 'string') {
             value = value.replace(new RegExp('(?:^|,\\s)' + name + ',?'), ',');
             value = value.replace(/^,|,$/, '');
-            node.setStyle(TRANSITION_CAMEL, value);
+            node.style[TRANSITION_CAMEL] = value;
         }
     },
 
     _onNativeEnd: function(e) {
         var node = this,
             uid = Y.stamp(node),
-            event = e._event,
+            event = e,//e._event,
             name = Transition._toCamel(event.propertyName),
             elapsed = event.elapsedTime,
             attrs = Transition._nodeAttrs[uid],
@@ -14728,12 +15179,12 @@ Transition.prototype = {
             };
 
             if (config && config.on && config.on.end) {
-                config.on.end.call(node, data);
+                config.on.end.call(Y.one(node), data);
             }
 
             //node.fire('transition:propertyEnd', data);
 
-            if (anim._count <= 0)  { // after propertEnd fires
+            if (anim._count <= 0)  { // after propertyEnd fires
                 anim._end(elapsed);
             }
         }
@@ -14741,9 +15192,13 @@ Transition.prototype = {
 
     destroy: function() {
         var anim = this;
+        /*
         if (anim._detach) {
             anim._detach.detach();
         }
+        */
+        //anim._node[ON_TRANSITION_END] = null;
+        node.removeEventListener(TRANSITION_END, anim._onNativeEnd, false);
         anim._node = null;
     }
 };
@@ -14778,7 +15233,7 @@ Y.TransitionNative = Transition; // TODO: remove
 */
 Y.Node.prototype.transition = function(name, config, callback) {
     var 
-        transitionAttrs = Transition._nodeAttrs[Y.stamp(this)],
+        transitionAttrs = Transition._nodeAttrs[Y.stamp(this._node)],
         anim = (transitionAttrs) ? transitionAttrs.transition || null : null,
         fxConfig,
         prop;
@@ -14813,7 +15268,7 @@ Y.Node.prototype.transition = function(name, config, callback) {
     if (anim && !anim._running) {
         anim.init(this, config);
     } else {
-        anim = new Transition(this, config);
+        anim = new Transition(this._node, config);
     }
 
     anim.run(callback);
@@ -14835,13 +15290,13 @@ Y.Node.prototype.show = function(name, config, callback) {
     return this;
 };
 
-var _wrapCallBack = function(fn, callback) {
+var _wrapCallBack = function(anim, fn, callback) {
     return function() {
         if (fn) {
-            fn.call(this);
+            fn.call(anim);
         }
         if (callback) {
-            callback.apply(this, arguments);
+            callback.apply(anim._node, arguments);
         }
     };
 };
@@ -14853,7 +15308,7 @@ Y.Node.prototype.hide = function(name, config, callback) {
             config = null;
         }
 
-        callback = _wrapCallBack(this._hide, callback); // wrap with existing callback
+        callback = _wrapCallBack(this, this._hide, callback); // wrap with existing callback
         if (typeof name !== 'string' && !name.push) { // named effect or array of effects supercedes default
             if (typeof config === 'function') {
                 callback = config;
@@ -14922,7 +15377,7 @@ Y.Node.prototype.toggleView = function(name, on) {
     if (on) {
         this._show();
     }  else {
-        callback = _wrapCallBack(this._hide);
+        callback = _wrapCallBack(anim, this._hide);
     }
 
     this._toggles[name] = on;
@@ -15093,7 +15548,7 @@ Y.mix(Transition.prototype, {
                         anim._count--;
 
                         if (config[name] && config[name].on && config[name].on.end) {
-                            config[name].on.end.call(node, data);
+                            config[name].on.end.call(Y.one(node), data);
                         }
 
                         //node.fire('transition:propertyEnd', data);
@@ -15134,7 +15589,7 @@ Y.mix(Transition.prototype, {
                 val = attribute.value;
 
                 // only allow supported properties
-                if (name in anim._node._node.style || name in Y.DOM.CUSTOM_STYLES) {
+                if (name in anim._node.style || name in Y.DOM.CUSTOM_STYLES) {
                     begin = (name in customAttr && 'get' in customAttr[name])  ?
                             customAttr[name].get(anim, name) : Transition.DEFAULT_GETTER(anim, name);
 
@@ -15213,7 +15668,7 @@ Y.mix(Y.Transition, {
     behaviors: {
         left: {
             get: function(anim, attr) {
-                return Y.DOM._getAttrOffset(anim._node._node, attr);
+                return Y.DOM._getAttrOffset(anim._node, attr);
             }
         }
     },
@@ -15233,13 +15688,13 @@ Y.mix(Y.Transition, {
 
         val = from + val[0] * (to - from);
 
-        if (att in node._node.style || att in Y.DOM.CUSTOM_STYLES) {
-            unit = unit || '';
-            node.setStyle(att, val + unit);
-        } else if (node._node.attributes[att]) {
-            node.setAttribute(att, val);
+        if (node) {
+            if (att in node.style || att in Y.DOM.CUSTOM_STYLES) {
+                unit = unit || '';
+                Y.DOM.setStyle(node, att, val + unit);
+            }
         } else {
-            node.set(att, val);
+            anim._end();
         }
     },
 
@@ -15253,12 +15708,8 @@ Y.mix(Y.Transition, {
         var node = anim._node,
             val = '';
 
-        if (att in node._node.style || att in Y.DOM.CUSTOM_STYLES) {
-            val = node.getComputedStyle(att);
-        } else if (node._node.attributes[att]) {
-            val = node.getAttribute(att);
-        } else {
-            val = node.get(att);
+        if (att in node.style || att in Y.DOM.CUSTOM_STYLES) {
+            val = Y.DOM.getComputedStyle(node, att);
         }
 
         return val;
@@ -15520,6 +15971,9 @@ var HAS_LAYOUT = 'hasLayout',
     UNDEFINED = undefined,
     documentElement = Y.config.doc.documentElement,
 
+    testFeature = Y.Features.test,
+    addFeature = Y.Features.add,
+
     // TODO: unit-less lineHeight (e.g. 1.22)
     re_unit = /^(\d[.\d]*)+(em|ex|px|gd|rem|vw|vh|vm|ch|mm|cm|in|pt|pc|deg|rad|ms|s|hz|khz|%){1}?/i,
 
@@ -15682,8 +16136,26 @@ var HAS_LAYOUT = 'hasLayout',
     //fontSize: getPixelFont,
     IEComputed = {};
 
+addFeature('style', 'computedStyle', {
+    test: function() {
+        return 'getComputedStyle' in Y.config.win;
+    }
+});
+
+addFeature('style', 'opacity', {
+    test: function() {
+        return 'opacity' in documentElement.style;
+    }
+});
+
+addFeature('style', 'filter', {
+    test: function() {
+        return 'filters' in documentElement;
+    }
+});
+
 // use alpha filter for IE opacity
-if (Y.UA.ie && Y.UA.ie < 9) {
+if (!testFeature('style', 'opacity') && testFeature('style', 'filter')) {
     Y.DOM.CUSTOM_STYLES[OPACITY] = {
         get: function(node) {
             var val = 100;
@@ -15701,18 +16173,24 @@ if (Y.UA.ie && Y.UA.ie < 9) {
 
         set: function(node, val, style) {
             var current,
-                styleObj;
+                styleObj = _getStyleObj(node),
+                currentFilter = styleObj[FILTER];
 
+            style = style || node.style;
             if (val === '') { // normalize inline style behavior
-                styleObj = _getStyleObj(node);
                 current = (OPACITY in styleObj) ? styleObj[OPACITY] : 1; // revert to original opacity
                 val = current;
             }
 
-            if (typeof style[FILTER] == 'string') { // in case not appended
-                style[FILTER] = 'alpha(' + OPACITY + '=' + val * 100 + ')';
-                
-                if (!node.currentStyle || !node.currentStyle[HAS_LAYOUT]) {
+            if (typeof currentFilter == 'string') { // in case not appended
+                style[FILTER] = currentFilter.replace(/alpha([^)]*\))/gi, '') +
+                        ((val < 1) ? 'alpha(' + OPACITY + '=' + val * 100 + ')' : '');
+
+                if (!style[FILTER]) {
+                    style.removeAttribute(FILTER);
+                }
+
+                if (!styleObj[HAS_LAYOUT]) {
                     style.zoom = 1; // needs layout 
                 }
             }
@@ -15726,7 +16204,7 @@ try {
     Y.DOM.CUSTOM_STYLES.height = {
         set: function(node, val, style) {
             var floatVal = parseFloat(val);
-            if (isNaN(floatVal) || floatVal >= 0) {
+            if (floatVal >= 0 || val === 'auto' || val === '') {
                 style.height = val;
             } else {
             }
@@ -15736,7 +16214,7 @@ try {
     Y.DOM.CUSTOM_STYLES.width = {
         set: function(node, val, style) {
             var floatVal = parseFloat(val);
-            if (isNaN(floatVal) || floatVal >= 0) {
+            if (floatVal >= 0 || val === 'auto' || val === '') {
                 style.width = val;
             } else {
             }
@@ -15744,30 +16222,30 @@ try {
     };
 }
 
-// TODO: top, right, bottom, left
-IEComputed[WIDTH] = IEComputed[HEIGHT] = ComputedStyle.getOffset;
+if (!testFeature('style', 'computedStyle')) {
+    // TODO: top, right, bottom, left
+    IEComputed[WIDTH] = IEComputed[HEIGHT] = ComputedStyle.getOffset;
 
-IEComputed.color = IEComputed.backgroundColor = ComputedStyle.getColor;
+    IEComputed.color = IEComputed.backgroundColor = ComputedStyle.getColor;
 
-IEComputed[BORDER_WIDTH] = IEComputed[BORDER_TOP_WIDTH] = IEComputed[BORDER_RIGHT_WIDTH] =
-        IEComputed[BORDER_BOTTOM_WIDTH] = IEComputed[BORDER_LEFT_WIDTH] =
-        ComputedStyle.getBorderWidth;
+    IEComputed[BORDER_WIDTH] = IEComputed[BORDER_TOP_WIDTH] = IEComputed[BORDER_RIGHT_WIDTH] =
+            IEComputed[BORDER_BOTTOM_WIDTH] = IEComputed[BORDER_LEFT_WIDTH] =
+            ComputedStyle.getBorderWidth;
 
-IEComputed.marginTop = IEComputed.marginRight = IEComputed.marginBottom =
-        IEComputed.marginLeft = ComputedStyle.getMargin;
+    IEComputed.marginTop = IEComputed.marginRight = IEComputed.marginBottom =
+            IEComputed.marginLeft = ComputedStyle.getMargin;
 
-IEComputed.visibility = ComputedStyle.getVisibility;
-IEComputed.borderColor = IEComputed.borderTopColor =
-        IEComputed.borderRightColor = IEComputed.borderBottomColor =
-        IEComputed.borderLeftColor = ComputedStyle.getBorderColor;
+    IEComputed.visibility = ComputedStyle.getVisibility;
+    IEComputed.borderColor = IEComputed.borderTopColor =
+            IEComputed.borderRightColor = IEComputed.borderBottomColor =
+            IEComputed.borderLeftColor = ComputedStyle.getBorderColor;
 
-if (!Y.config.win[GET_COMPUTED_STYLE]) {
     Y.DOM[GET_COMPUTED_STYLE] = ComputedStyle.get; 
-}
 
-Y.namespace('DOM.IE');
-Y.DOM.IE.COMPUTED = IEComputed;
-Y.DOM.IE.ComputedStyle = ComputedStyle;
+    Y.namespace('DOM.IE');
+    Y.DOM.IE.COMPUTED = IEComputed;
+    Y.DOM.IE.ComputedStyle = ComputedStyle;
+}
 
 })(Y);
 

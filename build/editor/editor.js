@@ -64,7 +64,7 @@ YUI.add('frame', function(Y) {
 
             this._iframe.set('height', '99%');
 
-
+            
             var html = '',
                 extra_css = ((this.get('extracss')) ? '<style id="extra_css">' + this.get('extracss') + '</style>' : '');
 
@@ -80,7 +80,9 @@ YUI.add('frame', function(Y) {
                 EXTRA_CSS: extra_css
             });
             if (Y.config.doc.compatMode != 'BackCompat') {
-                html = Frame.DOC_TYPE + "\n" + html;
+                
+                //html = Frame.DOC_TYPE + "\n" + html;
+                html = Frame.getDocType() + "\n" + html;
             } else {
             }
 
@@ -224,6 +226,7 @@ YUI.add('frame', function(Y) {
                 kfn = ((Y.UA.ie) ? Y.throttle(fn, 200) : fn);
 
             inst.Node.DOM_EVENTS.activate = 1;
+            inst.Node.DOM_EVENTS.beforedeactivate = 1;
             inst.Node.DOM_EVENTS.focusin = 1;
             inst.Node.DOM_EVENTS.deactivate = 1;
             inst.Node.DOM_EVENTS.focusout = 1;
@@ -233,7 +236,11 @@ YUI.add('frame', function(Y) {
                 if (v === 1) {
                     if (k !== 'focus' && k !== 'blur' && k !== 'paste') {
                         if (k.substring(0, 3) === 'key') {
-                            inst.on(k, kfn, inst.config.doc);
+                            if (k === 'keydown') {
+                                inst.on(k, fn, inst.config.doc);
+                            } else {
+                                inst.on(k, kfn, inst.config.doc);
+                            }
                         } else {
                             inst.on(k, fn, inst.config.doc);
                         }
@@ -251,11 +258,53 @@ YUI.add('frame', function(Y) {
 
             inst._use = inst.use;
             inst.use = Y.bind(this.use, this);
-
             this._iframe.setStyles({
                 visibility: 'inherit'
             });
             inst.one('body').setStyle('display', 'block');
+            if (Y.UA.ie) {
+                this._fixIECursors();
+            }
+        },
+        /**
+        * It appears that having a BR tag anywhere in the source "below" a table with a percentage width (in IE 7 & 8)
+        * if there is any TEXTINPUT's outside the iframe, the cursor will rapidly flickr and the CPU would occasionally 
+        * spike. This method finds all <BR>'s below the sourceIndex of the first table. Does some checks to see if they
+        * can be modified and replaces then with a <WBR> so the layout will remain in tact, but the flickering will
+        * no longer happen.
+        * @method _fixIECursors
+        * @private
+        */
+        _fixIECursors: function() {
+            var inst = this.getInstance(),
+                tables = inst.all('table'),
+                brs = inst.all('br'), si;
+
+            if (tables.size() && brs.size()) {
+                //First Table
+                si = tables.item(0).get('sourceIndex');
+                brs.each(function(n) {
+                    var p = n.get('parentNode'),
+                        c = p.get('children'), b = p.all('>br');
+                    
+                    if (p.test('div')) {
+                        if (c.size() > 2) {
+                            n.replace(inst.Node.create('<wbr>'));
+                        } else {
+                            if (n.get('sourceIndex') > si) {
+                                if (b.size()) {
+                                    n.replace(inst.Node.create('<wbr>'));
+                                }
+                            } else {
+                                if (b.size() > 1) {
+                                    n.replace(inst.Node.create('<wbr>'));
+                                }
+                            }
+                        }
+                    }
+                    
+                });
+            }
         },
         /**
         * @private
@@ -476,6 +525,7 @@ YUI.add('frame', function(Y) {
             }
 
             this._create(Y.bind(function(res) {
+
                 var inst, timer,
                     cb = Y.bind(function(i) {
                         this._instanceLoaded(i);
@@ -525,6 +575,10 @@ YUI.add('frame', function(Y) {
 
                 if (c.size() == 1) {
                     if (c.item(0).test('br')) {
+                        sel.selectNode(n, true, false);
+                    }
+                    if (c.item(0).test('p')) {
+                        n = c.item(0).one('br.yui-cursor').get('parentNode');
                         sel.selectNode(n, true, false);
                     }
                 }
@@ -618,6 +672,7 @@ YUI.add('frame', function(Y) {
             keypress: 1,
             activate: 1,
             deactivate: 1,
+            beforedeactivate: 1,
             focusin: 1,
             focusout: 1
         },
@@ -645,6 +700,36 @@ YUI.add('frame', function(Y) {
         * @type String
         */
         PAGE_HTML: '<html dir="{DIR}" lang="{LANG}"><head><title>{TITLE}</title>{META}<base href="{BASE_HREF}"/>{LINKED_CSS}<style id="editor_css">{DEFAULT_CSS}</style>{EXTRA_CSS}</head><body>{CONTENT}</body></html>',
+
+        /**
+        * @static
+        * @method getDocType
+        * @description Parses document.doctype and generates a DocType to match the parent page, if supported.
+        * For IE8, it grabs document.all[0].nodeValue and uses that. For IE < 8, it falls back to Frame.DOC_TYPE.
+        * @returns {String} The normalized DocType to apply to the iframe
+        */
+        getDocType: function() {
+            var dt = Y.config.doc.doctype,
+                str = Frame.DOC_TYPE;
+
+            if (dt) {
+                str = '<!DOCTYPE ' + dt.name + ((dt.publicId) ? ' ' + dt.publicId : '') + ((dt.systemId) ? ' ' + dt.systemId : '') + '>';
+            } else {
+                if (Y.config.doc.all) {
+                    dt = Y.config.doc.all[0];
+                    if (dt.nodeType) {
+                        if (dt.nodeType === 8) {
+                            if (dt.nodeValue) {
+                                if (dt.nodeValue.toLowerCase().indexOf('doctype') !== -1) {
+                                    str = '<!' + dt.nodeValue + '>';
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return str;
+        },
         /**
         * @static
         * @property DOC_TYPE
@@ -749,6 +834,18 @@ YUI.add('frame', function(Y) {
                 value: 'body',
                 setter: function(n) {
                     return Y.one(n);
+                }
+            },
+            /**
+            * @attribute node
+            * @description The Node instance of the iframe.
+            * @type Node
+            */
+            node: {
+                readOnly: true,
+                value: null,
+                getter: function() {
+                    return this._iframe;
                 }
             },
             /**
@@ -861,7 +958,9 @@ YUI.add('selection', function(Y) {
                         //This causes IE to not allow a selection on a doubleclick
                         //rng.select(nodes[i]);
                         if (rng.inRange(sel)) {
-                           ieNode = nodes[i]; 
+                            if (!ieNode) {
+                                ieNode = nodes[i];
+                            }
                         }
                     }
                 }
@@ -872,6 +971,11 @@ YUI.add('selection', function(Y) {
                     if (ieNode.nodeType !== 3) {
                         if (ieNode.firstChild) {
                             ieNode = ieNode.firstChild;
+                        }
+                        if (ieNode && ieNode.tagName && ieNode.tagName.toLowerCase() === 'body') {
+                            if (ieNode.firstChild) {
+                                ieNode = ieNode.firstChild;
+                            }
                         }
                     }
                     this.anchorNode = this.focusNode = Y.Selection.resolve(ieNode);
@@ -966,12 +1070,22 @@ YUI.add('selection', function(Y) {
         Y.each(hrs, function(hr) {
             var el = doc.createElement('div');
                 el.className = 'hr yui-non yui-skip';
-                el.setAttribute('style', 'border: 1px solid #ccc; line-height: 0; font-size: 0;margin-top: 5px; margin-bottom: 5px;');
+                
                 el.setAttribute('readonly', true);
                 el.setAttribute('contenteditable', false); //Keep it from being Edited
                 if (hr.parentNode) {
                     hr.parentNode.replaceChild(el, hr);
                 }
+                //Had to move to inline style. writes for ie's < 8. They don't render el.setAttribute('style');
+                var s = el.style;
+                s.border = '1px solid #ccc';
+                s.lineHeight = '0';
+                s.fontSize = '0';
+                s.marginTop = '5px';
+                s.marginBottom = '5px';
+                s.marginLeft = '0px';
+                s.marginRight = '0px';
+                s.padding = '0';
         });
         
 
@@ -1046,7 +1160,9 @@ YUI.add('selection', function(Y) {
         if (single.size() === 1) {
             br = single.item(0).all('br');
             if (br.size() === 1) {
-                br.item(0).remove();
+                if (!br.item(0).test('.yui-cursor')) {
+                    br.item(0).remove();
+                }
                 var html = single.item(0).get('innerHTML');
                 if (html === '' || html === ' ') {
                     single.set('innerHTML', Y.Selection.CURSOR);
@@ -1181,7 +1297,8 @@ YUI.add('selection', function(Y) {
         }
         
         Y.all('.hr').addClass('yui-skip').addClass('yui-non');
-
+        
+        /*
         nodes.each(function(n) {
             n.addClass(n._yuid);
             n.setStyle(FONT_FAMILY, '');
@@ -1189,6 +1306,7 @@ YUI.add('selection', function(Y) {
                 n.removeAttribute('style');
             }
         });
+        */
         
         return html;
     };
@@ -1200,14 +1318,15 @@ YUI.add('selection', function(Y) {
     * @return {Node} The Resolved node
     */
     Y.Selection.resolve = function(n) {
-        console.log(n);
         if (n && n.nodeType === 3) {
             //Adding a try/catch here because in rare occasions IE will
             //Throw a error accessing the parentNode of a stranded text node.
             //In the case of Ctrl+Z (Undo)
             try {
                 n = n.parentNode;
-            } catch (re) {}
+            } catch (re) {
+                n = 'body';
+            }
         }
         return Y.one(n);
     };
@@ -1274,7 +1393,7 @@ YUI.add('selection', function(Y) {
     * @static
     * @property CURSOR
     */
-    Y.Selection.CURSOR = '<span id="' + Y.Selection.CURID + '"><br class="yui-cursor"></span>';
+    Y.Selection.CURSOR = '<span><br class="yui-cursor"></span>';
 
     Y.Selection.hasCursor = function() {
         var cur = Y.all('#' + Y.Selection.CUR_WRAPID);
@@ -1506,7 +1625,11 @@ YUI.add('selection', function(Y) {
                     if (html === '' || html === '<br>') {
                         node.append(newNode);
                     } else {
-                        node.insert(newNode, 'before');
+                        if (newNode.get('parentNode')) {
+                            node.insert(newNode, 'before');
+                        } else {
+                            Y.one('body').prepend(newNode);
+                        }
                     }
                     if (node.get('firstChild').test('br')) {
                         node.get('firstChild').remove();
@@ -1620,6 +1743,9 @@ YUI.add('selection', function(Y) {
         * @return {Y.Selection}
         */
         selectNode: function(node, collapse, end) {
+            if (!node) {
+                return;
+            }
             end = end || 0;
             node = Y.Node.getDOMNode(node);
 		    var range = this.createRange();
@@ -1755,12 +1881,16 @@ YUI.add('exec-command', function(Y) {
             command: function(action, value) {
                 var fn = ExecCommand.COMMANDS[action];
                 
-                Y.later(0, this, function() {
-                    var inst = this.getInstance();
-                    if (inst && inst.Selection) {
-                        inst.Selection.cleanCursor();
-                    }
-                });
+                /*
+                if (action !== 'insertbr') {
+                    Y.later(0, this, function() {
+                        var inst = this.getInstance();
+                        if (inst && inst.Selection) {
+                            inst.Selection.cleanCursor();
+                        }
+                    });
+                }
+                */
 
                 if (fn) {
                     return fn.call(this, action, value);
@@ -1778,6 +1908,14 @@ YUI.add('exec-command', function(Y) {
             _command: function(action, value) {
                 var inst = this.getInstance();
                 try {
+                    try {
+                        inst.config.doc.execCommand('styleWithCSS', null, 1);
+                    } catch (e1) {
+                        try {
+                            inst.config.doc.execCommand('useCSS', null, 0);
+                        } catch (e2) {
+                        }
+                    }
                     inst.config.doc.execCommand(action, null, value);
                 } catch (e) {
                 }
@@ -2059,6 +2197,67 @@ YUI.add('exec-command', function(Y) {
                 }
             }
         });
+        
+        /**
+        * This method is meant to normalize IE's in ability to exec the proper command on elements with CSS styling.
+        * @method fixIETags
+        * @protected
+        * @param {String} cmd The command to execute
+        * @param {String} tag The tag to create
+        * @param {String} rule The rule that we are looking for.
+        */
+        var fixIETags = function(cmd, tag, rule) {
+            var inst = this.getInstance(),
+                doc = inst.config.doc,
+                sel = doc.selection.createRange(),
+                o = doc.queryCommandValue(cmd),
+                html, reg, m, p, d, s, c;
+
+            if (o) {
+                html = sel.htmlText;
+                reg = new RegExp(rule, 'g');
+                m = html.match(reg);
+
+                if (m) {
+                    html = html.replace(rule + ';', '').replace(rule, '');
+
+                    sel.pasteHTML('<var id="yui-ie-bs">');
+
+                    p = doc.getElementById('yui-ie-bs');
+                    d = doc.createElement('div');
+                    s = doc.createElement(tag);
+                    
+                    d.innerHTML = html;
+                    if (p.parentNode !== inst.config.doc.body) {
+                        p = p.parentNode;
+                    }
+
+                    c = d.childNodes;
+
+                    p.parentNode.replaceChild(s, p);
+
+                    Y.each(c, function(f) {
+                        s.appendChild(f);
+                    });
+                    sel.collapse();
+                    sel.moveToElementText(s);
+                    sel.select();
+                }
+            }
+            this._command(cmd);
+        };
+
+        if (Y.UA.ie) {
+            ExecCommand.COMMANDS.bold = function() {
+                fixIETags.call(this, 'bold', 'b', 'FONT-WEIGHT: bold');
+            }
+            ExecCommand.COMMANDS.italic = function() {
+                fixIETags.call(this, 'italic', 'i', 'FONT-STYLE: italic');
+            }
+            ExecCommand.COMMANDS.underline = function() {
+                fixIETags.call(this, 'underline', 'u', 'TEXT-DECORATION: underline');
+            }
+        }
 
         Y.namespace('Plugin');
         Y.Plugin.ExecCommand = ExecCommand;
@@ -2183,11 +2382,15 @@ YUI.add('createlink-base', function(Y) {
         * @return {Node} Node instance of the item touched by this command.
         */
         createlink: function(cmd) {
-            var inst = this.get('host').getInstance(), out, a, sel,
+            var inst = this.get('host').getInstance(), out, a, sel, holder,
                 url = prompt(CreateLinkBase.STRINGS.PROMPT, CreateLinkBase.STRINGS.DEFAULT);
 
             if (url) {
-                url = escape(url);
+                holder = inst.config.doc.createElement('div');
+                url = inst.config.doc.createTextNode(url);
+                holder.appendChild(url);
+                url = holder.innerHTML;
+
 
                 this.get('host')._execCommand(cmd, url);
                 sel = new inst.Selection();
@@ -2378,21 +2581,22 @@ YUI.add('editor-base', function(Y) {
             
             switch (e.changedType) {
                 case 'keydown':
-                    //inst.later(100, inst, inst.Selection.cleanCursor);
-                    inst.Selection.cleanCursor();
+                    if (!Y.UA.gecko) {
+                        if (!EditorBase.NC_KEYS[e.changedEvent.keyCode] && !e.changedEvent.shiftKey && !e.changedEvent.ctrlKey && (e.changedEvent.keyCode !== 13)) {
+                            //inst.later(100, inst, inst.Selection.cleanCursor);
+                        }
+                    }
                     break;
                 case 'tab':
                     if (!e.changedNode.test('li, li *') && !e.changedEvent.shiftKey) {
                         e.changedEvent.frameEvent.preventDefault();
                         if (Y.UA.webkit) {
                             this.execCommand('inserttext', '\t');
-                        } else {
+                        } else if (Y.UA.gecko) {
+                            this.frame.exec._command('inserthtml', '<span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>');
+                        } else if (Y.UA.ie) {
                             sel = new inst.Selection();
-                            sel.setCursor();
-                            cur = sel.getCursor();
-                            cur.insert(EditorBase.TABKEY, 'before');
-                            sel.focusCursor();
-                            inst.Selection.cleanCursor();
+                            sel._selection.pasteHTML(EditorBase.TABKEY);
                         }
                     }
                     break;
@@ -2427,9 +2631,13 @@ YUI.add('editor-base', function(Y) {
 
                 //Bold and Italic styles
                 var s = el.currentStyle || el.style;
-
                 if ((''+s.fontWeight) == 'bold') { //Cast this to a string
                     cmds.bold = 1;
+                }
+                if (Y.UA.ie) {
+                    if (s.fontWeight > 400) {
+                        cmds.bold = 1;
+                    }
                 }
                 if (s.fontStyle == 'italic') {
                     cmds.italic = 1;
@@ -2579,15 +2787,26 @@ YUI.add('editor-base', function(Y) {
 
             if (Y.UA.ie) {
                 this.frame.on('dom:activate', Y.bind(this._onFrameActivate, this));
-                this.frame.on('dom:keyup', Y.throttle(Y.bind(this._onFrameKeyUp, this), 800));
-                this.frame.on('dom:keypress', Y.throttle(Y.bind(this._onFrameKeyPress, this), 800));
-            } else {
-                this.frame.on('dom:keyup', Y.bind(this._onFrameKeyUp, this));
-                this.frame.on('dom:keypress', Y.bind(this._onFrameKeyPress, this));
+                this.frame.on('dom:beforedeactivate', Y.bind(this._beforeFrameDeactivate, this));
             }
+            this.frame.on('dom:keyup', Y.bind(this._onFrameKeyUp, this));
+            this.frame.on('dom:keypress', Y.bind(this._onFrameKeyPress, this));
 
             inst.Selection.filter();
             this.fire('ready');
+        },
+        /**
+        * Caches the current cursor position in IE.
+        * @method _beforeFrameDeactivate
+        * @private
+        */
+        _beforeFrameDeactivate: function() {
+            var inst = this.getInstance(),
+                sel = inst.config.doc.selection.createRange();
+            
+            if ((!sel.compareEndPoints('StartToEnd', sel))) {
+                sel.pasteHTML('<var id="yui-ie-cursor">');
+            }
         },
         /**
         * Moves the cached selection bookmark back so IE can place the cursor in the right place.
@@ -2595,16 +2814,21 @@ YUI.add('editor-base', function(Y) {
         * @private
         */
         _onFrameActivate: function() {
-            if (this._lastBookmark) {
-                try {
-                    var inst = this.getInstance(),
-                        sel = inst.config.doc.selection.createRange(),
-                        bk = sel.moveToBookmark(this._lastBookmark);
+            var inst = this.getInstance(),
+                sel = new inst.Selection(),
+                range = sel.createRange(),
+                cur = inst.all('#yui-ie-cursor');
 
-                    sel.select();
-                    this._lastBookmark = null;
-                } catch (e) {
-                }
+            if (cur.size()) {
+                cur.each(function(n) {
+                    n.set('id', '');
+                    range.moveToElementText(n._node);
+                    range.move('character', -1);
+                    range.move('character', 1);
+                    range.select();
+                    range.text = '';
+                    n.remove();
+                });
             }
         },
         /**
@@ -2952,13 +3176,18 @@ YUI.add('editor-base', function(Y) {
             * @attribute content
             */
             content: {
-                value: '<br>',
+                value: '<br class="yui-cursor">',
                 setter: function(str) {
                     if (str.substr(0, 1) === "\n") {
                         str = str.substr(1);
                     }
                     if (str === '') {
-                        str = '<br>';
+                        str = '<br class="yui-cursor">';
+                    }
+                    if (str === ' ') {
+                        if (Y.UA.gecko) {
+                            str = '<br class="yui-cursor">';
+                        }
                     }
                     return this.frame.set('content', str);
                 },
@@ -3461,27 +3690,40 @@ YUI.add('editor-bidi', function(Y) {
         var inst = this.getInstance(),
             sel = new inst.Selection(),
             returnValue, block,
-            selected, selectedBlocks;
+            selected, selectedBlocks, dir;
 
         inst.Selection.filterBlocks();
         if (sel.isCollapsed) { // No selection
             block = EditorBidi.blockParent(sel.anchorNode);
+            if (!direction) {
+                //If no direction is set, auto-detect the proper setting to make it "toggle"
+                dir = block.getAttribute(DIR);
+                if (!dir || dir == 'ltr') {
+                    direction = 'rtl';
+                } else {
+                    direction = 'ltr';
+                }
+            }
             block.setAttribute(DIR, direction);
             returnValue = block;
         } else { // some text is selected
             selected = sel.getSelected();
             selectedBlocks = [];
             selected.each(function(node) {
-                if (!node.test(BODY)) { // workaround for a YUI bug
+                /*
+                * Temporarily removed this check, should already be fixed
+                * in Y.Selection.getSelected()
+                */
+                //if (!node.test(BODY)) { // workaround for a YUI bug
                    selectedBlocks.push(EditorBidi.blockParent(node));
-                }
+                //}
             });
             selectedBlocks = inst.all(EditorBidi.addParents(selectedBlocks));
             selectedBlocks.setAttribute(DIR, direction);
             returnValue = selectedBlocks;
         }
 
-        this.get(HOST).get(HOST).editorBidi.checkForChange();
+        this.get(HOST).get(HOST).editorBidi._checkForChange();
         return returnValue;
     };
 
@@ -3521,8 +3763,10 @@ YUI.add('editor-para', function(Y) {
         _fixFirstPara: function() {
             var host = this.get(HOST), inst = host.getInstance(), sel;
             inst.one('body').set('innerHTML', '<' + P + '>' + inst.Selection.CURSOR + '</' + P + '>');
+            var n = inst.one(FIRST_P);
             sel = new inst.Selection();
-            sel.focusCursor(true, false);
+            sel.selectNode(n, true, false);
+            
         },
         /**
         * nodeChange handler to handle fixing an empty document.
@@ -3852,13 +4096,18 @@ YUI.add('editor-br', function(Y) {
         * @method _onKeyDown
         */
         _onKeyDown: function(e) {
+            if (e.stopped) {
+                e.halt();
+                return;
+            }
             if (e.keyCode == 13) {
                 var host = this.get(HOST), inst = host.getInstance(),
-                    sel = new inst.Selection();
+                    sel = new inst.Selection(),
+                    last = '';
 
                 if (sel) {
                     if (Y.UA.ie) {
-                        if (!sel.anchorNode.test(LI) && !sel.anchorNode.ancestor(LI)) {
+                        if (!sel.anchorNode || (!sel.anchorNode.test(LI) && !sel.anchorNode.ancestor(LI))) {
                             sel._selection.pasteHTML('<br>');
                             sel._selection.collapse(false);
                             sel._selection.select();
@@ -3889,6 +4138,32 @@ YUI.add('editor-br', function(Y) {
                 inst.on('keydown', Y.bind(this._onKeyDown, this), inst.config.doc);
             }
         },
+        /**
+        * Adds a nodeChange listener only for FF, in the event of a backspace or delete, it creates an empy textNode
+        * inserts it into the DOM after the e.changedNode, then removes it. Causing FF to redraw the content.
+        * @private
+        * @method _onNodeChange
+        * @param {Event} e The nodeChange event.
+        */
+        _onNodeChange: function(e) {
+            switch (e.changedType) {
+                case 'backspace-up':
+                case 'backspace-down':
+                case 'delete-up':
+                    /**
+                    * This forced FF to redraw the content on backspace.
+                    * On some occasions FF will leave a cursor residue after content has been deleted.
+                    * Dropping in the empty textnode and then removing it causes FF to redraw and
+                    * remove the "ghost cursors"
+                    */
+                    var inst = this.get(HOST).getInstance();
+                    var d = e.changedNode;
+                    var t = inst.config.doc.createTextNode(' ');
+                    d.appendChild(t);
+                    d.removeChild(t);
+                    break;
+            }
+        },
         initializer: function() {
             var host = this.get(HOST);
             if (host.editorPara) {
@@ -3896,6 +4171,9 @@ YUI.add('editor-br', function(Y) {
                 return;
             }
             host.after('ready', Y.bind(this._afterEditorReady, this));
+            if (Y.UA.gecko) {
+                host.on('nodeChange', Y.bind(this._onNodeChange, this));
+            }
         }
     }, {
         /**
@@ -3926,5 +4204,5 @@ YUI.add('editor-br', function(Y) {
 }, '@VERSION@' ,{requires:['node'], skinnable:false});
 
 
-YUI.add('editor', function(Y){}, '@VERSION@' ,{skinnable:false, use:['frame', 'selection', 'exec-command', 'editor-base', 'editor-para', 'editor-br']});
+YUI.add('editor', function(Y){}, '@VERSION@' ,{skinnable:false, use:['frame', 'selection', 'exec-command', 'editor-base', 'editor-para', 'editor-br', 'editor-bidi', 'createlink-base']});
 
