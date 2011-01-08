@@ -340,6 +340,7 @@ proto = {
             useBrowserConsole: true,
             throwFail: true,
             bootstrap: true,
+            cacheUse: true,
             fetchCSS: true
         };
 
@@ -617,13 +618,15 @@ proto = {
         } else {
             key = args.join();
 
-            if (Y.Env.serviced[key]) {
+            if (Y.config.cacheUse && Y.Env.serviced[key]) {
                 Y.log('already provisioned: ' + key, 'info', 'yui');
                 Y._notify(callback, ALREADY_DONE, args);
             } else {
                 Y._use(args, function(Y, response) {
-                    Y.log('caching request: ' + key, 'info', 'yui');
-                    Y.Env.serviced[key] = true;
+                    if (Y.config.cacheUse) {
+                        Y.log('caching request: ' + key, 'info', 'yui');
+                        Y.Env.serviced[key] = true;
+                    }
                     Y._notify(callback, response, args);
                 });
             }
@@ -633,7 +636,9 @@ proto = {
     },
 
     _notify: function(callback, response, args) {
-        if (callback) {
+        if (!response.success && this.config.loadErrorFn) {
+            this.config.loadErrorFn.call(this, this, callback, response, args);
+        } else if (callback) {
             try {
                 callback(this, response);
             } catch (e) {
@@ -904,11 +909,12 @@ Y.log('Fetching loader: ' + config.base + config.loaderPath, 'info', 'yui');
      * a JS error is thrown
      * @method error
      * @param msg {string} the error message.
-     * @param e {Error} Optional JS error that was caught.  If supplied
+     * @param e {Error|string} Optional JS error that was caught, or an error string.
+     * @param data Optional additional info
      * and throwFail is specified, this error will be re-thrown.
      * @return {YUI} this YUI instance.
      */
-    error: function(msg, e) {
+    error: function(msg, e, data) {
 
         var Y = this, ret;
 
@@ -1466,6 +1472,42 @@ Y.log('Fetching loader: ' + config.base + config.loaderPath, 'info', 'yui');
  * @since 3.2.0
  * @property errorFn
  * @type Function
+ */
+
+/**
+ * A callback to execute when the loader fails to load one or
+ * more resource.  This could be because of a script load
+ * failure.  It can also fail if a javascript module fails
+ * to register itself, but only when the 'requireRegistration'
+ * is true.  If this function is defined, the use() callback will
+ * only be called when the loader succeeds, otherwise it always
+ * executes unless there was a javascript error when attaching
+ * a module.
+ *
+ * @since 3.3.0
+ * @property loadErrorFn
+ * @type Function
+ */
+
+/**
+ * When set to true, the YUI loader will expect that all modules
+ * it is responsible for loading will be first-class YUI modules
+ * that register themselves with the YUI global.  If this is
+ * set to true, loader will fail if the module registration fails
+ * to happen after the script is loaded.
+ *
+ * @since 3.3.0
+ * @property requireRegistration
+ * @type boolean
+ * @default false
+ */
+
+/**
+ * Cache serviced use() requests.
+ * @since 3.3.0
+ * @property cacheUse
+ * @type boolean
+ * @default true
  */
 
 /**
@@ -14649,6 +14691,68 @@ YUI.add('io-base', function(Y) {
 
 
 }, '@VERSION@' ,{requires:['event-custom-base', 'querystring-stringify-simple']});
+YUI.add('querystring-stringify-simple', function(Y) {
+
+/*global Y */
+/**
+ * <p>Provides Y.QueryString.stringify method for converting objects to Query Strings.
+ * This is a subset implementation of the full querystring-stringify.</p>
+ * <p>This module provides the bare minimum functionality (encoding a hash of simple values),
+ * without the additional support for nested data structures.  Every key-value pair is
+ * encoded by encodeURIComponent.</p>
+ * <p>This module provides a minimalistic way for io to handle  single-level objects
+ * as transaction data.</p>
+ *
+ * @module querystring
+ * @submodule querystring-stringify-simple
+ * @for QueryString
+ * @static
+ */
+
+var QueryString = Y.namespace("QueryString"),
+    EUC = encodeURIComponent;
+
+/**
+ * <p>Converts a simple object to a Query String representation.</p>
+ * <p>Nested objects, Arrays, and so on, are not supported.</p>
+ *
+ * @method stringify
+ * @for QueryString
+ * @public
+ * @submodule querystring-stringify-simple
+ * @param obj {Object} A single-level object to convert to a querystring.
+ * @param cfg {Object} (optional) Configuration object.  In the simple
+ *                                module, only the arrayKey setting is
+ *                                supported.  When set to true, the key of an
+ *                                array will have the '[]' notation appended
+ *                                to the key;.
+ * @static
+ */
+QueryString.stringify = function (obj, c) {
+    var qs = [],
+        // Default behavior is false; standard key notation.
+        s = c && c.arrayKey ? true : false,
+        key, i, l;
+
+    for (key in obj) {
+        if (obj.hasOwnProperty(key)) {
+            if (Y.Lang.isArray(obj[key])) {
+                for (i = 0, l = obj[key].length; i < l; i++) {
+                    qs.push(EUC(s ? key + '[]' : key) + '=' + EUC(obj[key][i]));
+                }
+            }
+            else {
+                qs.push(EUC(key) + '=' + EUC(obj[key]));
+            }
+        }
+    }
+
+    return qs.join('&');
+};
+
+
+
+}, '@VERSION@' );
 YUI.add('json-parse', function(Y) {
 
 /**

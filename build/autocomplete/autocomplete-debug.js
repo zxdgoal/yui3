@@ -856,9 +856,7 @@ AutoCompleteBase.prototype = {
      */
     _syncUIACBase: function () {
         this._syncBrowserAutocomplete();
-
-        this.set(VALUE, this.get(INPUT_NODE).get(VALUE),
-                {src: AutoCompleteBase.UI_SRC});
+        this.set(VALUE, this.get(INPUT_NODE).get(VALUE));
     },
 
     // -- Protected Prototype Methods ------------------------------------------
@@ -1524,7 +1522,7 @@ AutoCompleteBase.prototype = {
 Y.AutoCompleteBase = AutoCompleteBase;
 
 
-}, '@VERSION@' ,{requires:['array-extras', 'base-build', 'escape', 'event-valuechange', 'node-base'], optional:['autocomplete-sources']});
+}, '@VERSION@' ,{optional:['autocomplete-sources'], requires:['array-extras', 'base-build', 'escape', 'event-valuechange', 'node-base']});
 YUI.add('autocomplete-sources', function(Y) {
 
 /**
@@ -1912,7 +1910,7 @@ ACSources.ATTRS = {
 Y.Base.mix(Y.AutoCompleteBase, [ACSources]);
 
 
-}, '@VERSION@' ,{requires:['autocomplete-base'], optional:['io-base', 'json-parse', 'jsonp', 'yql']});
+}, '@VERSION@' ,{optional:['io-base', 'json-parse', 'jsonp', 'yql'], requires:['autocomplete-base']});
 YUI.add('autocomplete-list', function(Y) {
 
 /**
@@ -2197,19 +2195,29 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
      * @protected
      */
     _bindInput: function () {
-        var inputNode  = this._inputNode,
-            tokenInput = this.get('tokenInput'),
-            alignNode  = (tokenInput && tokenInput.get('boundingBox')) ||
-                            inputNode;
+        var inputNode = this._inputNode,
+            alignNode, alignWidth, tokenInput;
 
-        // If this is a tokenInput, align with its bounding box. Otherwise,
-        // align with the inputNode.
-        if (!this.get('align.node')) {
-            this.set('align.node', alignNode);
-        }
+        // Null align means we can auto-align. Set align to false to prevent
+        // auto-alignment, or a valid alignment config to customize the
+        // alignment.
+        if (this.get('align') === null) {
+            // If this is a tokenInput, align with its bounding box.
+            // Otherwise, align with the inputNode. Bit of a cheat.
+            tokenInput = this.get('tokenInput');
+            alignNode  = (tokenInput && tokenInput.get('boundingBox')) || inputNode;
 
-        if (!this.get(WIDTH)) {
-            this.set(WIDTH, alignNode.get('offsetWidth'));
+            this.set('align', {
+                node  : alignNode,
+                points: ['tl', 'bl']
+            });
+
+            // If no width config is set, attempt to set the list's width to the
+            // width of the alignment node. If the alignment node's width is
+            // falsy, do nothing.
+            if (!this.get(WIDTH) && (alignWidth = alignNode.get('offsetWidth'))) {
+                this.set(WIDTH, alignWidth);
+            }
         }
 
         // Attach inputNode events.
@@ -2381,6 +2389,11 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
         } else {
             this.set(ACTIVE_ITEM, null);
             this._set(HOVERED_ITEM, null);
+
+            // Force a reflow to work around a glitch in IE6 and 7 where some of
+            // the contents of the list will sometimes remain visible after the
+            // container is hidden.
+            this._boundingBox.get('offsetWidth');
         }
     },
 
@@ -2529,8 +2542,6 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
     _onItemClick: function (e) {
         var itemNode = e.currentTarget;
 
-        e.preventDefault();
-
         this.set(ACTIVE_ITEM, itemNode);
         this.selectItem(itemNode);
     },
@@ -2577,13 +2588,6 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
         activeItem: {
             setter: Y.one,
             value: null
-        },
-
-        // The "align" attribute is documented in WidgetPositionAlign.
-        align: {
-            value: {
-                points: ['tl', 'bl']
-            }
         },
 
         /**
@@ -2691,7 +2695,7 @@ Y.AutoCompleteList = List;
 Y.AutoComplete = List;
 
 
-}, '@VERSION@' ,{lang:['en'], requires:['autocomplete-base', 'selector-css3', 'widget', 'widget-position', 'widget-position-align', 'widget-stack'], after:['autocomplete-sources'], skinnable:true});
+}, '@VERSION@' ,{after:['autocomplete-sources'], requires:['autocomplete-base', 'selector-css3', 'widget', 'widget-position', 'widget-position-align', 'widget-stack'], lang:['en'], skinnable:true});
 YUI.add('autocomplete-plugin', function(Y) {
 
 /**
