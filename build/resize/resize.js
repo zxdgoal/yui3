@@ -457,7 +457,7 @@ Y.Resize = Y.extend(
 		/**
 		 * Each box has a content area and optional surrounding padding and
 		 * border areas. This property stores the sum of all horizontal
-		 * surrounding * information needed to adjust the node height.
+		 * surrounding information needed to adjust the node height.
 		 *
 		 * @property totalHSurrounding
 		 * @default 0
@@ -468,7 +468,7 @@ Y.Resize = Y.extend(
 		/**
 		 * Each box has a content area and optional surrounding padding and
 		 * border areas. This property stores the sum of all vertical
-		 * surrounding * information needed to adjust the node height.
+		 * surrounding information needed to adjust the node height.
 		 *
 		 * @property totalVSurrounding
 		 * @default 0
