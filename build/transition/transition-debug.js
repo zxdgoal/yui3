@@ -594,7 +594,7 @@ Y.Node.prototype.toggleView = function(name, on) {
     if (on) {
         this._show();
     }  else {
-        callback = _wrapCallBack(anim, this._hide);
+        callback = _wrapCallBack(this, this._hide);
     }
 
     this._toggles[name] = on;
@@ -662,7 +662,7 @@ Y.mix(Transition.fx, {
 });
 
 Y.mix(Transition.toggles, {
-    size: ['sizeIn', 'sizeOut'],
+    size: ['sizeOut', 'sizeIn'],
     fade: ['fadeOut', 'fadeIn']
 });
 

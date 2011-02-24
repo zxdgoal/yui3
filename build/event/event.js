@@ -1145,6 +1145,9 @@ Event._interval = setInterval(Event._poll, Event.POLL_INTERVAL);
          */
         _unload: function(e) {
             Y.each(_wrappers, function(v, k) {
+                if (v.type == 'unload') {
+                    v.fire(e);
+                }
                 v.detachAll();
                 remove(v.el, v.type, v.fn, v.capture);
                 delete _wrappers[k];
@@ -1349,7 +1352,7 @@ function delegate(type, fn, el, filter) {
 
     if (typeBits.length > 1) {
         cat  = typeBits.shift();
-        type = typeBits.shift();
+        args[0] = type = typeBits.shift();
     }
 
     synth = Y.Node.DOM_EVENTS[type];
@@ -1586,6 +1589,7 @@ var DOMMap   = Y.Env.evt.dom_map,
     YLang    = Y.Lang,
     isObject = YLang.isObject,
     isString = YLang.isString,
+    isArray  = YLang.isArray,
     query    = Y.Selector.query,
     noop     = function () {};
 
@@ -2285,38 +2289,41 @@ Y.SyntheticEvent = SyntheticEvent;
  * @in event-synthetic
  */
 Y.Event.define = function (type, config, force) {
-    if (!config) {
-        config = {};
-    }
+    var eventDef, Impl, synth;
 
-    var eventDef = (isObject(type)) ? type : Y.merge({ type: type }, config),
-        Impl, synth;
+    if (config) {
+        eventDef = (isObject(type)) ? type : Y.merge({ type: type }, config);
 
-    if (force || !Y.Node.DOM_EVENTS[eventDef.type]) {
-        Impl = function () {
-            SyntheticEvent.apply(this, arguments);
-        };
-        Y.extend(Impl, SyntheticEvent, eventDef);
-        synth = new Impl();
+        if (force || !Y.Node.DOM_EVENTS[eventDef.type]) {
+            Impl = function () {
+                SyntheticEvent.apply(this, arguments);
+            };
+            Y.extend(Impl, SyntheticEvent, eventDef);
+            synth = new Impl();
 
-        type = synth.type;
+            type = synth.type;
 
-        Y.Node.DOM_EVENTS[type] = Y.Env.evt.plugins[type] = {
-            eventDef: synth,
+            Y.Node.DOM_EVENTS[type] = Y.Env.evt.plugins[type] = {
+                eventDef: synth,
 
-            on: function () {
-                return synth._on(toArray(arguments));
-            },
+                on: function () {
+                    return synth._on(toArray(arguments));
+                },
 
-            delegate: function () {
-                return synth._on(toArray(arguments), true);
-            },
+                delegate: function () {
+                    return synth._on(toArray(arguments), true);
+                },
 
-            detach: function () {
-                return synth._detach(toArray(arguments));
-            }
-        };
+                detach: function () {
+                    return synth._detach(toArray(arguments));
+                }
+            };
 
+        }
+    } else if (isString(type) || isArray(type)) {
+        Y.Array.each(toArray(type), function (t) {
+            Y.Node.DOM_EVENTS[t] = 1;
+        });
     }
 
     return synth;
@@ -2785,13 +2792,22 @@ var isFunction = Y.Lang.isFunction,
 
         on: function (node, sub, notifier, filter) {
             sub._detach = node[(filter) ? "delegate" : "on"]({
-                mouseenter: Y.bind(notifier.fire, notifier),
-                mouseleave: sub._extra
+                mouseenter: function (e) {
+                    e.phase = 'over';
+                    notifier.fire(e);
+                },
+                mouseleave: function (e) {
+                    var thisObj = sub.context || this;
+
+                    e.type = 'hover';
+                    e.phase = 'out';
+                    sub._extra.apply(thisObj, [e].concat(sub.args));
+                }
             }, filter);
         },
 
         detach: function (node, sub, notifier) {
-            sub._detacher.detach();
+            sub._detach.detach();
         }
     };
 

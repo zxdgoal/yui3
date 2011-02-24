@@ -90,6 +90,16 @@ YUI.add('editor-para', function(Y) {
                     }
                     break;
                 case 'enter':
+                    if (Y.UA.ie) {
+                        if (e.changedNode.test('br')) {
+                            e.changedNode.remove();
+                        } else if (e.changedNode.test('p, span')) {
+                            var b = e.changedNode.one('br.yui-cursor');
+                            if (b) {
+                                b.remove();
+                            }
+                        }
+                    }
                     if (Y.UA.webkit) {
                         //Webkit doesn't support shift+enter as a BR, this fixes that.
                         if (e.changedEvent.shiftKey) {
@@ -247,7 +257,7 @@ YUI.add('editor-para', function(Y) {
             }
             if (Y.UA.gecko) {
                 if (e.changedNode && !e.changedNode.test(btag)) {
-                    var p = e.changedNode.ancestor(btag);
+                    p = e.changedNode.ancestor(btag);
                     if (p) {
                         this._lastPara = p;
                     }

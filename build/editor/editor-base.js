@@ -369,6 +369,7 @@ YUI.add('editor-base', function(Y) {
             }
             this.frame.on('dom:keyup', Y.bind(this._onFrameKeyUp, this));
             this.frame.on('dom:keypress', Y.bind(this._onFrameKeyPress, this));
+            this.frame.on('dom:paste', Y.bind(this._onPaste, this));
 
             inst.Selection.filter();
             this.fire('ready');
@@ -378,11 +379,14 @@ YUI.add('editor-base', function(Y) {
         * @method _beforeFrameDeactivate
         * @private
         */
-        _beforeFrameDeactivate: function() {
+        _beforeFrameDeactivate: function(e) {
+            if (e.frameTarget.test('html')) { //Means it came from a scrollbar
+                return;
+            }
             var inst = this.getInstance(),
                 sel = inst.config.doc.selection.createRange();
             
-            if ((!sel.compareEndPoints('StartToEnd', sel))) {
+            if (sel.compareEndPoints && !sel.compareEndPoints('StartToEnd', sel)) {
                 sel.pasteHTML('<var id="yui-ie-cursor">');
             }
         },
@@ -391,7 +395,10 @@ YUI.add('editor-base', function(Y) {
         * @method _onFrameActivate
         * @private
         */
-        _onFrameActivate: function() {
+        _onFrameActivate: function(e) {
+            if (e.frameTarget.test('html')) { //Means it came from a scrollbar
+                return;
+            }
             var inst = this.getInstance(),
                 sel = new inst.Selection(),
                 range = sel.createRange(),
@@ -400,14 +407,26 @@ YUI.add('editor-base', function(Y) {
             if (cur.size()) {
                 cur.each(function(n) {
                     n.set('id', '');
-                    range.moveToElementText(n._node);
-                    range.move('character', -1);
-                    range.move('character', 1);
-                    range.select();
-                    range.text = '';
+                    if (range.moveToElementText) {
+                        try {
+                            range.moveToElementText(n._node);
+                            range.move('character', -1);
+                            range.move('character', 1);
+                            range.select();
+                            range.text = '';
+                        } catch (e) {}
+                    }
                     n.remove();
                 });
             }
+        },
+        /**
+        * Fires nodeChange event
+        * @method _onPaste
+        * @private
+        */
+        _onPaste: function(e) {
+            this.fire('nodeChange', { changedNode: e.frameTarget, changedType: 'paste', changedEvent: e.frameEvent });
         },
         /**
         * Fires nodeChange event
@@ -824,7 +843,7 @@ YUI.add('editor-base', function(Y) {
 
     /**
     * @event nodeChange
-    * @description Fired from mouseup & keyup.
+    * @description Fired from several mouse/key/paste event points.
     * @param {Event.Facade} event An Event Facade object with the following specific properties added:
     * <dl>
     *   <dt>changedEvent</dt><dd>The event that caused the nodeChange</dd>

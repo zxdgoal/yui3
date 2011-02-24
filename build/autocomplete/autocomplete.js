@@ -1515,7 +1515,7 @@ AutoCompleteBase.prototype = {
 Y.AutoCompleteBase = AutoCompleteBase;
 
 
-}, '@VERSION@' ,{optional:['autocomplete-sources'], requires:['array-extras', 'base-build', 'escape', 'event-valuechange', 'node-base']});
+}, '@VERSION@' ,{requires:['array-extras', 'base-build', 'escape', 'event-valuechange', 'node-base'], optional:['autocomplete-sources']});
 YUI.add('autocomplete-sources', function(Y) {
 
 /**
@@ -1769,7 +1769,8 @@ ACSources.prototype = {
 
                     env        = that.get('yqlEnv');
                     maxResults = that.get(MAX_RESULTS);
-                    opts       = {proto: that.get('yqlProtocol')};
+
+                    opts = {proto: that.get('yqlProtocol')};
 
                     yqlQuery = Lang.sub(source, {
                         maxResults: maxResults > 0 ? maxResults : 1000,
@@ -1782,11 +1783,16 @@ ACSources.prototype = {
                     if (yqlRequest) {
                         yqlRequest._callback   = callback;
                         yqlRequest._opts       = opts;
-                        yqlRequest._params.env = env;
                         yqlRequest._params.q   = yqlQuery;
+
+                        if (env) {
+                            yqlRequest._params.env = env;
+                        }
                     } else {
-                        yqlRequest = new Y.YQLRequest(yqlQuery, callback,
-                                env ? {env: env} : null, opts);
+                        yqlRequest = new Y.YQLRequest(yqlQuery, {
+                            on: {success: callback},
+                            allowCache: false // temp workaround until JSONP has per-URL callback proxies
+                        }, env ? {env: env} : null, opts);
                     }
 
                     yqlRequest.send();
@@ -1903,7 +1909,7 @@ ACSources.ATTRS = {
 Y.Base.mix(Y.AutoCompleteBase, [ACSources]);
 
 
-}, '@VERSION@' ,{optional:['io-base', 'json-parse', 'jsonp', 'yql'], requires:['autocomplete-base']});
+}, '@VERSION@' ,{requires:['autocomplete-base'], optional:['io-base', 'json-parse', 'jsonp', 'yql']});
 YUI.add('autocomplete-list', function(Y) {
 
 /**
@@ -2012,6 +2018,10 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
     destructor: function () {
         while (this._listEvents.length) {
             this._listEvents.pop().detach();
+        }
+
+        if (this._ariaNode) {
+            this._ariaNode.remove().destroy(true);
         }
     },
 
@@ -2688,7 +2698,7 @@ Y.AutoCompleteList = List;
 Y.AutoComplete = List;
 
 
-}, '@VERSION@' ,{after:['autocomplete-sources'], requires:['autocomplete-base', 'selector-css3', 'widget', 'widget-position', 'widget-position-align', 'widget-stack'], lang:['en'], skinnable:true});
+}, '@VERSION@' ,{after:['autocomplete-sources'], lang:['en'], skinnable:true, requires:['autocomplete-base', 'selector-css3', 'widget', 'widget-position', 'widget-position-align', 'widget-stack']});
 YUI.add('autocomplete-plugin', function(Y) {
 
 /**

@@ -107,6 +107,10 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
         while (this._listEvents.length) {
             this._listEvents.pop().detach();
         }
+
+        if (this._ariaNode) {
+            this._ariaNode.remove().destroy(true);
+        }
     },
 
     bindUI: function () {
@@ -782,4 +786,4 @@ Y.AutoCompleteList = List;
 Y.AutoComplete = List;
 
 
-}, '@VERSION@' ,{after:['autocomplete-sources'], requires:['autocomplete-base', 'selector-css3', 'widget', 'widget-position', 'widget-position-align', 'widget-stack'], lang:['en'], skinnable:true});
+}, '@VERSION@' ,{after:['autocomplete-sources'], lang:['en'], skinnable:true, requires:['autocomplete-base', 'selector-css3', 'widget', 'widget-position', 'widget-position-align', 'widget-stack']});

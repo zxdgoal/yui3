@@ -76,12 +76,12 @@
                 
             } else {
                 //This helps IE deal with a selection and nodeChange events
-                if (sel.htmlText) {
+                if (sel.htmlText && sel.htmlText !== '') {
                     var n = Y.Node.create(sel.htmlText);
-                    if (n.get('id')) {
+                    if (n && n.get('id')) {
                         var id = n.get('id');
                         this.anchorNode = this.focusNode = Y.one('#' + id);
-                    } else {
+                    } else if (n) {
                         n = n.get('childNodes');
                         this.anchorNode = this.focusNode = n.item(0);
                     }
@@ -112,6 +112,23 @@
     };
     
     /**
+    * Utility method to remove dead font-family styles from an element.
+    * @static
+    * @method removeFontFamily
+    */
+    Y.Selection.removeFontFamily = function(n) {
+        n.removeAttribute('face');
+        var s = n.getAttribute('style').toLowerCase();
+        if (s === '' || (s == 'font-family: ')) {
+            n.removeAttribute('style');
+        }
+        if (s.match(Y.Selection.REG_FONTFAMILY)) {
+            s = s.replace(Y.Selection.REG_FONTFAMILY, '');
+            n.setAttribute('style', s);
+        }
+    };
+
+    /**
     * Performs a prefilter on all nodes in the editor. Looks for nodes with a style: fontFamily or font face
     * It then creates a dynamic class assigns it and removed the property. This is so that we don't lose
     * the fontFamily when selecting nodes.
@@ -124,8 +141,7 @@
 
         var nodes = Y.all(Y.Selection.ALL),
             baseNodes = Y.all('strong,em'),
-            doc = Y.config.doc,
-            hrs = doc.getElementsByTagName('hr'),
+            doc = Y.config.doc, hrs,
             classNames = {}, cssString = '',
             ls;
 
@@ -135,18 +151,8 @@
             if (raw.style[FONT_FAMILY]) {
                 classNames['.' + n._yuid] = raw.style[FONT_FAMILY];
                 n.addClass(n._yuid);
-                raw.style[FONT_FAMILY] = 'inherit';
 
-                raw.removeAttribute('face');
-                if (raw.getAttribute('style') === '') {
-                    raw.removeAttribute('style');
-                }
-                //This is for IE
-                if (raw.getAttribute('style')) {
-                    if (raw.getAttribute('style').toLowerCase() === 'font-family: ') {
-                        raw.removeAttribute('style');
-                    }
-                }
+                Y.Selection.removeFontFamily(raw);
             }
             /*
             if (n.getStyle(FONT_FAMILY)) {
@@ -168,27 +174,30 @@
         Y.log('Node Filter Timer: ' + (endTime1 - startTime1) + 'ms', 'info', 'selection');
 
         Y.all('.hr').addClass('yui-skip').addClass('yui-non');
-
-        Y.each(hrs, function(hr) {
-            var el = doc.createElement('div');
-                el.className = 'hr yui-non yui-skip';
-                
-                el.setAttribute('readonly', true);
-                el.setAttribute('contenteditable', false); //Keep it from being Edited
-                if (hr.parentNode) {
-                    hr.parentNode.replaceChild(el, hr);
-                }
-                //Had to move to inline style. writes for ie's < 8. They don't render el.setAttribute('style');
-                var s = el.style;
-                s.border = '1px solid #ccc';
-                s.lineHeight = '0';
-                s.fontSize = '0';
-                s.marginTop = '5px';
-                s.marginBottom = '5px';
-                s.marginLeft = '0px';
-                s.marginRight = '0px';
-                s.padding = '0';
-        });
+        
+        if (Y.UA.ie) {
+            hrs = doc.getElementsByTagName('hr');
+            Y.each(hrs, function(hr) {
+                var el = doc.createElement('div');
+                    el.className = 'hr yui-non yui-skip';
+                    
+                    el.setAttribute('readonly', true);
+                    el.setAttribute('contenteditable', false); //Keep it from being Edited
+                    if (hr.parentNode) {
+                        hr.parentNode.replaceChild(el, hr);
+                    }
+                    //Had to move to inline style. writes for ie's < 8. They don't render el.setAttribute('style');
+                    var s = el.style;
+                    s.border = '1px solid #ccc';
+                    s.lineHeight = '0';
+                    s.fontSize = '0';
+                    s.marginTop = '5px';
+                    s.marginBottom = '5px';
+                    s.marginLeft = '0px';
+                    s.marginRight = '0px';
+                    s.padding = '0';
+            });
+        }
         
 
         Y.each(classNames, function(v, k) {
@@ -275,6 +284,9 @@
                     sel = new Y.Selection();
                     sel.focusCursor(true, true);
                 }
+                if (br.item(0).test('.yui-cursor') && Y.UA.ie) {
+                    br.item(0).remove();
+                }
             }
         } else {
             single.each(function(p) {
@@ -324,11 +336,18 @@
     };
 
     /**
+    * Regular Expression used to find dead font-family styles
+    * @static
+    * @property REG_FONTFAMILY
+    */   
+    Y.Selection.REG_FONTFAMILY = /font-family: ;/;
+
+    /**
     * Regular Expression to determine if a string has a character in it
     * @static
     * @property REG_CHAR
     */   
-    Y.Selection.REG_CHAR = /[a-zA-Z-0-9_]/gi;
+    Y.Selection.REG_CHAR = /[a-zA-Z-0-9_!@#\$%\^&*\(\)-=_+\[\]\\{}|;':",.\/<>\?]/gi;
 
     /**
     * Regular Expression to determine if a string has a non-character in it
@@ -652,10 +671,7 @@
             nodes.each(function(n, k) {
                 if (n.getStyle(FONT_FAMILY) ==  Y.Selection.TMP) {
                     n.setStyle(FONT_FAMILY, '');
-                    n.removeAttribute('face');
-                    if (n.getAttribute('style') === '') {
-                        n.removeAttribute('style');
-                    }
+                    Y.Selection.removeFontFamily(n);
                     if (!n.test('body')) {
                         items.push(Y.Node.getDOMNode(nodes.item(k)));
                     }
@@ -693,20 +709,47 @@
 
             
             if (range.pasteHTML) {
-                newNode = Y.Node.create(html);
-                try {
-                    range.pasteHTML('<span id="rte-insert"></span>');
-                } catch (e) {}
-                inHTML = Y.one('#rte-insert');
-                if (inHTML) {
-                    inHTML.set('id', '');
-                    inHTML.replace(newNode);
-                    return newNode;
+                if (offset === 0 && node && !node.previous() && node.get('nodeType') === 3) {
+                    /**
+                    * For some strange reason, range.pasteHTML fails if the node is a textNode and
+                    * the offset is 0. (The cursor is at the beginning of the line)
+                    * It will always insert the new content at position 1 instead of 
+                    * position 0. Here we test for that case and do it the hard way.
+                    */
+                    node.insert(html, 'before');
+                    if (range.moveToElementText) {
+                        range.moveToElementText(Y.Node.getDOMNode(node.previous()));
+                    }
+                    //Move the cursor after the new node
+                    range.collapse(false);
+                    range.select();
+                    return node.previous();
                 } else {
-                    Y.on('available', function() {
+                    newNode = Y.Node.create(html);
+                    try {
+                        range.pasteHTML('<span id="rte-insert"></span>');
+                    } catch (e) {}
+                    inHTML = Y.one('#rte-insert');
+                    if (inHTML) {
                         inHTML.set('id', '');
                         inHTML.replace(newNode);
-                    }, '#rte-insert');
+                        if (range.moveToElementText) {
+                            range.moveToElementText(Y.Node.getDOMNode(newNode));
+                        }
+                        range.collapse(false);
+                        range.select();
+                        return newNode;
+                    } else {
+                        Y.on('available', function() {
+                            inHTML.set('id', '');
+                            inHTML.replace(newNode);
+                            if (range.moveToElementText) {
+                                range.moveToElementText(Y.Node.getDOMNode(newNode));
+                            }
+                            range.collapse(false);
+                            range.select();
+                        }, '#rte-insert');
+                    }
                 }
             } else {
                 //TODO using Y.Node.create here throws warnings & strips first white space character
@@ -786,10 +829,12 @@
                     this._selection.removeAllRanges();
                     this._selection.addRange(range);
                 } else {
-                    range.moveToElementText(Y.Node.getDOMNode(first));
-                    range2 = this.createRange();
-                    range2.moveToElementText(Y.Node.getDOMNode(last));
-                    range.setEndPoint('EndToEnd', range2);
+                    if (range.moveToElementText) {
+                        range.moveToElementText(Y.Node.getDOMNode(first));
+                        range2 = this.createRange();
+                        range2.moveToElementText(Y.Node.getDOMNode(last));
+                        range.setEndPoint('EndToEnd', range2);
+                    }
                     range.select();
                 }
 

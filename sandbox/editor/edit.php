@@ -55,6 +55,14 @@
             position: absolute;
             top: 500px;
         }
+        #board {
+            position: absolute;
+            top: 10px;
+            right: 3px;
+            width: 220px;
+            border: 1px solid black;
+            padding: .5em;
+        }
 	</style>
 </head>
 <body class="yui-skin-sam">
@@ -101,6 +109,7 @@
         <a href ="#" value="insertunorderedlist">InsertUnOrderedList</a>
         <a href ="#" value="createlink">createlink</a>
         <a href ="#" value="inserthorizontalrule">inserthorizontalrule</a>
+        <a href ="#" value="nocolor">nocolor</a>
         <a href ="#" value="backcolor">backcolor</a>
         <a href ="#" value="forecolor">forecolor</a>
         <a href ="#" value="justifycenter">justifycenter</a>
@@ -108,6 +117,7 @@
         <a href ="#" value="justifyright">justifyright</a>
         <a href ="#" value="justifyfull">justifyfull</a>
         <a href ="#" value="replacecontent">ReplaceContent</a>
+        <a href ="#" value="insertbr">InsertBR</a>
     </div>
     <div id="test"></div>
     <div id="smilies"></div>
@@ -118,8 +128,7 @@
 <button id="setHTML">Set HTML</button>
 <button id="focusEditor">Focus Editor</button>
 <!--button id="showEditor">Show Editor</button-->
-
-<div id="stub">
+<div id="board">
     <b>This is bold</b><br><br>
     <strong>This is strong</strong><br><br>
     <span style="font-weight: bold">This is font-weight bold</span><br><br>
@@ -129,7 +138,18 @@
     <span style="text-decoration: underline">This is text-decoration: underline</span><br><br>
     <span style="font-weight: bold; text-decoration: underline; font-style:italic;">This is a multi styled element.</span>
 </div>
-<!--Above the HR
+
+<div id="stub">
+</div>
+<!--
+    <b>This is bold</b><br><br>
+    <strong>This is strong</strong><br><br>
+    <span style="font-weight: bold">This is font-weight bold</span><br><br>
+    <i>This is italic</i><br><br>
+    <span style="font-style: italic">This is font-style italic</span><br><br>
+    <u>This is underline</u><br><br>
+    <span style="text-decoration: underline">This is text-decoration: underline</span><br><br>
+    <span style="font-weight: bold; text-decoration: underline; font-style:italic;">This is a multi styled element.</span>
 <hr size="1">
 <?php //include('mail.php'); ?>
     <ul>
@@ -195,8 +215,8 @@ This is some <strong>other</strong> loose test.
 <ul>
 </div-->
 
-<!--script type="text/javascript" src="../../build/yui/yui-debug.js?bust=<?php echo(time()); ?>"></script-->
-<script type="text/javascript" src="http://yui.yahooapis.com/3.2.0/build/yui/yui-debug.js"></script>
+<script type="text/javascript" src="../../build/yui/yui-debug.js?bust=<?php echo(time()); ?>"></script>
+<!--script type="text/javascript" src="http://yui.yahooapis.com/3.2.0/build/yui/yui-debug.js"></script-->
 
 
 <script type="text/javascript" src="js/editor-base.js?bust=<?php echo(time()); ?>"></script>
@@ -261,6 +281,10 @@ YUI(yConfig).use('node', 'selector-css3', 'base', 'editor-base', 'editor-para', 
                 break;
             case 'inserthtml':
                 val = ' <span style="color: red; background-color: blue;">Inserted Text (' + (new Date()).toString() + ')</span> ';
+                break;
+            case 'nocolor':
+                cmd = 'backcolor';
+                val = '#ffffff';
                 break;
             case 'backcolor':
             case 'forecolor':
@@ -389,6 +413,7 @@ YUI(yConfig).use('node', 'selector-css3', 'base', 'editor-base', 'editor-para', 
 
     editor = new Y.EditorBase({
         content: Y.one('#stub').get('innerHTML'),
+        //defaultblock: 'div',
         /*
         linkedcss: [
             'http://yui.yahooapis.com/2.8.1/build/reset/reset.css',
@@ -401,6 +426,8 @@ YUI(yConfig).use('node', 'selector-css3', 'base', 'editor-base', 'editor-para', 
     });
     //editor.plug(Y.Plugin.EditorBR);
     editor.plug(Y.Plugin.EditorPara);
+    editor.plug(Y.Plugin.EditorBidi);
+    editor.plug(Y.Plugin.EditorLists);
     editor.on('dom:keydown', function(e) {
         if (e.keyCode === 13) {
             //editor.set('content', ' ');
@@ -482,8 +509,8 @@ YUI(yConfig).use('node', 'selector-css3', 'base', 'editor-base', 'editor-para', 
     editor.on('frame:ready', function() {
         Y.log('frame:ready, set content', 'info', 'editor');
         var inst = this.getInstance();
-        this.set('content', '<p>' + inst.Selection.CURSOR + '</p>');
-        //this.set('content', inst.Selection.CURSOR + '<hr><p>This is some content below the HR</p>');
+        //this.set('content', '<p>' + inst.Selection.CURSOR + '</p>');
+        this.set('content', '<p>' + inst.Selection.CURSOR + '</p><br><p>This is some content below the HR</p>');
         //this.set('content', ' ');
 
         //This stops image resizes, but for all images!!
