@@ -22,7 +22,8 @@ Y.StackedBarSeries = Y.Base.create("stackedBarSeries", Y.BarSeries, [Y.StackingU
 			return;
 		}
 
-        var style = this.get("styles").marker,
+        var isNumber = Y.Lang.isNumber,
+            style = this.get("styles").marker,
             w = style.width,
             h = style.height,
             xcoords = this.get("xcoords"),
@@ -42,14 +43,8 @@ Y.StackedBarSeries = Y.Base.create("stackedBarSeries", Y.BarSeries, [Y.StackingU
             negativeBaseValues,
             positiveBaseValues,
             useOrigin = order === 0,
-            totalHeight = len * h,
-            hotspot,
-            isChrome = ISCHROME;
+            totalHeight = len * h;
         this._createMarkerCache();
-        if(isChrome)
-        {
-            this._createHotspotCache();
-        }
         if(totalHeight > this.get("height"))
         {
             ratio = this.height/totalHeight;
@@ -73,7 +68,10 @@ Y.StackedBarSeries = Y.Base.create("stackedBarSeries", Y.BarSeries, [Y.StackingU
         {
             top = ycoords[i];
             left = xcoords[i];
-            
+            if(!isNumber(top) || !isNumber(left))
+            {
+                continue;
+            }
             if(useOrigin)
             {
                 w = Math.abs(left - this._leftOrigin);
@@ -113,20 +111,11 @@ Y.StackedBarSeries = Y.Base.create("stackedBarSeries", Y.BarSeries, [Y.StackingU
             top -= h/2;        
             style.width = w;
             style.height = h;
+            style.x = left;
+            style.y = top;
             marker = this.getMarker(style, graphOrder, i);
-            marker.setPosition(left, top);
-            if(isChrome)
-            {
-                hotspot = this.getHotspot(style, graphOrder, i);
-                hotspot.setPosition(left, top);
-                hotspot.parentNode.style.zIndex = 5;
-            }
         }
         this._clearMarkerCache();
-        if(isChrome)
-        {
-            this._clearHotspotCache();
-        }
     },
 
     /**
@@ -148,12 +137,10 @@ Y.StackedBarSeries = Y.Base.create("stackedBarSeries", Y.BarSeries, [Y.StackingU
                 styles = this.get("styles").marker,
                 h = styles.height,
                 markerStyles = state == "off" || !styles[state] ? styles : styles[state]; 
-            markerStyles.width = marker.width;
-            marker.update(markerStyles);
-            if(marker.parentNode)
-            {
-                Y.one(marker.parentNode).setStyle("top", (ycoords[i] - h/2));
-            }
+            markerStyles.y = (ycoords[i] - h/2);
+            markerStyles.x = marker.get("x");
+            markerStyles.width = marker.get("width");
+            marker.set(markerStyles);
         }
     },
 	

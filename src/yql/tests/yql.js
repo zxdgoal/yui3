@@ -1,21 +1,4 @@
-YUI({
-    base: '../../../build/',
-    //filter: 'DEBUG',
-    filter: 'RAW',
-    logExclude: {
-        'YUI': true,
-        Event: true,
-        Base: true,
-        Attribute: true,
-        augment: true,
-        useConsole: true
-    }
-}).use('yql', 'console', 'test', 'substitute', 'selector-css3', function(Y) {
-        var myConsole = new Y.Console({
-            height: Y.one(window).get('winHeight') + 'px',
-            width: '375px'
-        }).render();    
-            
+YUI.add('yql-tests', function(Y) {
 
     var template = {
         name: 'YQL Test',
@@ -50,12 +33,23 @@ YUI({
                 Y.Assert.isObject(returnedQuery.error);
             };
             this.wait(wait, 1500);
+        },
+        test_escaped: function() {
+            var returnedQuery;
+            Y.YQL("select * from html where url = \"http://instantwatcher.com/genres/506\" and xpath='//div[@id=\"titles\"]/ul/li/a'", function(r) {
+                returnedQuery = r;
+            });
+            var wait = function() {
+                Y.Assert.isObject(returnedQuery);
+                Y.Assert.isObject(returnedQuery.query);
+            };
+            this.wait(wait, 2500);
         }
     };
     var suite = new Y.Test.Suite("YQL");
     
     suite.add(new Y.Test.Case(template));
     Y.Test.Runner.add(suite);
-    Y.Test.Runner.run();
+
 });
 

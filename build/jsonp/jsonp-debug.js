@@ -45,17 +45,6 @@ function JSONPRequest() {
 
 JSONPRequest.prototype = {
     /**
-     * Number of requests currently pending responses.  Used by connections
-     * configured to allowCache to make sure the proxy isn't deleted until
-     * the last response has returned.
-     *
-     * @property _requests
-     * @private
-     * @type {Number}
-     */
-    _requests: 0,
-
-    /**
      * Set up the success and failure handlers and the regex pattern used
      * to insert the temporary callback name in the url.
      *
@@ -68,6 +57,32 @@ JSONPRequest.prototype = {
      */
     _init : function (url, callback) {
         this.url = url;
+
+        /**
+         * Map of the number of requests currently pending responses per
+         * generated proxy.  Used to ensure the proxy is not flushed if the
+         * request times out and there is a timeout handler and success
+         * handler, and used by connections configured to allowCache to make
+         * sure the proxy isn't deleted until the last response has returned.
+         *
+         * @property _requests
+         * @private
+         * @type {Object}
+         */
+        this._requests = {};
+
+        /**
+         * Map of the number of timeouts received from the destination url
+         * by generated proxy.  Used to ensure the proxy is not flushed if the
+         * request times out and there is a timeout handler and success
+         * handler, and used by connections configured to allowCache to make
+         * sure the proxy isn't deleted until the last response has returned.
+         *
+         * @property _timeouts
+         * @private
+         * @type {Object}
+         */
+        this._timeouts = {};
 
         // Accept a function, an object, or nothing
         callback = (isFunction(callback)) ?
@@ -120,11 +135,17 @@ JSONPRequest.prototype = {
         // TODO: support allowCache as time value
         if (config.allowCache) {
             self._proxy = proxy;
-
-            // In case additional requests are issued before the current request
-            // returns, don't remove the proxy.
-            self._requests++;
         }
+
+        if (self._requests[proxy] === undefined) {
+            self._requests[proxy] = 0;
+        }
+        if (self._timeouts[proxy] === undefined) {
+            self._timeouts[proxy] = 0;
+        }
+        self._requests[proxy]++;
+
+        Y.log('sending ' + proxy);
 
         args.unshift(self.url, 'YUI.Env.JSONP.' + proxy);
         url = config.format.apply(self, args);
@@ -134,13 +155,38 @@ JSONPRequest.prototype = {
             return self;
         }
 
-        function wrap(fn) {
+        function wrap(fn, isTimeout) {
             return (isFunction(fn)) ?
                 function (data) {
-                    if (!config.allowCache || !--self._requests) {
+                    var execute = true,
+                        counter = '_requests';
+
+                    //if (config.allowCache) {
+                        // A lot of wrangling to make sure timeouts result in
+                        // fewer success callbacks, but the proxy is properly
+                        // cleaned up.
+                        if (isTimeout) {
+                            ++self._timeouts[proxy];
+                            --self._requests[proxy];
+                            Y.log(proxy + ' timed out - timeouts(' + self._timeouts[proxy] + ') requests(' + self._requests[proxy] + ')');
+                        } else {
+                            if (!self._requests[proxy]) {
+                                execute = false;
+                                counter = '_timeouts';
+                            }
+                            --self[counter][proxy];
+                            Y.log(proxy + ' response received - timeouts(' + self._timeouts[proxy] + ') requests(' + self._requests[proxy] + ')');
+                        }
+                    //}
+
+                    if (!self._requests[proxy] && !self._timeouts[proxy]) {
+                        Y.log('deleting ' + proxy);
                         delete YUI.Env.JSONP[proxy];
                     }
-                    fn.apply(config.context, [data].concat(config.args));
+
+                    if (execute) {
+                        fn.apply(config.context, [data].concat(config.args));
+                    }
                 } :
                 null;
         }
@@ -151,7 +197,7 @@ JSONPRequest.prototype = {
 
         Y.Get.script(url, {
             onFailure: wrap(config.on.failure),
-            onTimeout: wrap(config.on.timeout),
+            onTimeout: wrap(config.on.timeout, true),
             timeout  : config.timeout
         });
 

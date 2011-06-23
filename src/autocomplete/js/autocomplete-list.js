@@ -8,7 +8,6 @@
  * @uses AutoCompleteBase
  * @uses WidgetPosition
  * @uses WidgetPositionAlign
- * @uses WidgetStack
  * @constructor
  * @param {Object} config Configuration object.
  */
@@ -16,6 +15,9 @@
 var Lang   = Y.Lang,
     Node   = Y.Node,
     YArray = Y.Array,
+
+    // Whether or not we need an iframe shim.
+    useShim = Y.UA.ie && Y.UA.ie < 7,
 
     // keyCode constants.
     KEY_TAB = 9,
@@ -44,8 +46,7 @@ var Lang   = Y.Lang,
 List = Y.Base.create('autocompleteList', Y.Widget, [
     Y.AutoCompleteBase,
     Y.WidgetPosition,
-    Y.WidgetPositionAlign,
-    Y.WidgetStack
+    Y.WidgetPositionAlign
 ], {
     // -- Prototype Properties -------------------------------------------------
     ARIA_TEMPLATE: '<div/>',
@@ -117,11 +118,12 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
     },
 
     renderUI: function () {
-        var ariaNode   = this._createAriaNode(),
-            contentBox = this.get('contentBox'),
-            inputNode  = this._inputNode,
+        var ariaNode    = this._createAriaNode(),
+            boundingBox = this.get('boundingBox'),
+            contentBox  = this.get('contentBox'),
+            inputNode   = this._inputNode,
             listNode,
-            parentNode = inputNode.get('parentNode');
+            parentNode  = inputNode.get('parentNode');
 
         listNode = this._createListNode();
         this._set('listNode', listNode);
@@ -138,14 +140,27 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
         // when the widget is hidden.
         parentNode.append(ariaNode);
 
+        // Add an iframe shim for IE6.
+        if (useShim) {
+            boundingBox.plug(Y.Plugin.Shim);
+        }
+
+        // Force position: absolute on the boundingBox. This works around a
+        // potential CSS loading race condition in Gecko that can cause the
+        // boundingBox to become relatively positioned, which is all kinds of
+        // no good.
+        boundingBox.setStyle('position', 'absolute');
+
         this._ariaNode    = ariaNode;
-        this._boundingBox = this.get('boundingBox');
+        this._boundingBox = boundingBox;
         this._contentBox  = contentBox;
         this._listNode    = listNode;
         this._parentNode  = parentNode;
     },
 
     syncUI: function () {
+        // No need to call _syncPosition() here; the other _sync methods will
+        // call it when necessary.
         this._syncResults();
         this._syncVisibility();
     },
@@ -170,9 +185,11 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
      *
      * @method selectItem
      * @param {Node} itemNode (optional) Item node to select.
+     * @param {EventFacade} originEvent (optional) Event that triggered the
+     *     selection, if any.
      * @chainable
      */
-    selectItem: function (itemNode) {
+    selectItem: function (itemNode, originEvent) {
         if (itemNode) {
             if (!itemNode.hasClass(this[_CLASS_ITEM])) {
                 return this;
@@ -186,8 +203,9 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
         }
 
         this.fire(EVT_SELECT, {
-            itemNode: itemNode,
-            result  : itemNode.getData(RESULT)
+            itemNode   : itemNode,
+            originEvent: originEvent || null,
+            result     : itemNode.getData(RESULT)
         });
 
         return this;
@@ -321,6 +339,8 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
      */
     _bindList: function () {
         this._listEvents.concat([
+            Y.on('windowresize', this._syncPosition, this),
+
             this.after({
               mouseover: this._afterMouseOver,
               mouseout : this._afterMouseOut,
@@ -423,6 +443,20 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
     },
 
     /**
+     * Synchronizes the result list's position and alignment.
+     *
+     * @method _syncPosition
+     * @protected
+     */
+    _syncPosition: function () {
+        // Force WidgetPositionAlign to refresh its alignment.
+        this._syncUIPosAlign();
+
+        // Resize the IE6 iframe shim to match the list's dimensions.
+        this._syncShim();
+    },
+
+    /**
      * Synchronizes the results displayed in the list with those in the
      * <i>results</i> argument, or with the <code>results</code> attribute if an
      * argument is not provided.
@@ -432,8 +466,6 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
      * @protected
      */
     _syncResults: function (results) {
-        var items;
-
         if (!results) {
             results = this.get(RESULTS);
         }
@@ -441,14 +473,27 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
         this._clear();
 
         if (results.length) {
-            items = this._add(results);
+            this._add(results);
             this._ariaSay('items_available');
         }
+
+        this._syncPosition();
 
         if (this.get('activateFirstItem') && !this.get(ACTIVE_ITEM)) {
             this.set(ACTIVE_ITEM, this._getFirstItemNode());
         }
     },
+
+    /**
+     * Synchronizes the size of the iframe shim used for IE6 and lower. In other
+     * browsers, this method is a noop.
+     *
+     * @method _syncShim
+     * @protected
+     */
+    _syncShim: useShim ? function () {
+        this._boundingBox.shim.sync();
+    } : function () {},
 
     /**
      * Synchronizes the visibility of the tray with the <i>visible</i> argument,
@@ -473,8 +518,7 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
         this._boundingBox.set('aria-hidden', !visible);
 
         if (visible) {
-            // Force WidgetPositionAlign to refresh its alignment.
-            this._syncUIPosAlign();
+            this._syncPosition();
         } else {
             this.set(ACTIVE_ITEM, null);
             this._set(HOVERED_ITEM, null);
@@ -632,7 +676,7 @@ List = Y.Base.create('autocompleteList', Y.Widget, [
         var itemNode = e.currentTarget;
 
         this.set(ACTIVE_ITEM, itemNode);
-        this.selectItem(itemNode);
+        this.selectItem(itemNode, e);
     },
 
     // -- Protected Default Event Handlers -------------------------------------

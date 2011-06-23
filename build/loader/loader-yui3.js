@@ -48,7 +48,59 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "node-screen"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "anim-base", 
+            "anim-color", 
+            "anim-curve", 
+            "anim-easing", 
+            "anim-node-plugin", 
+            "anim-scroll", 
+            "anim-xy"
+        ]
+    }, 
+    "app": {
+        "submodules": {
+            "controller": {
+                "optional": [
+                    "querystring-parse"
+                ], 
+                "requires": [
+                    "array-extras", 
+                    "base-build", 
+                    "history"
+                ]
+            }, 
+            "model": {
+                "requires": [
+                    "base-build", 
+                    "escape", 
+                    "json-parse"
+                ]
+            }, 
+            "model-list": {
+                "requires": [
+                    "array-extras", 
+                    "array-invoke", 
+                    "arraylist", 
+                    "base-build", 
+                    "json-parse", 
+                    "model"
+                ]
+            }, 
+            "view": {
+                "requires": [
+                    "base-build", 
+                    "node-event-delegate"
+                ]
+            }
+        }, 
+        "use": [
+            "controller", 
+            "model", 
+            "model-list", 
+            "view"
+        ]
     }, 
     "arraysort": {
         "requires": [
@@ -72,7 +124,11 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "attribute-base"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "attribute-base", 
+            "attribute-complex"
+        ]
     }, 
     "autocomplete": {
         "submodules": {
@@ -120,7 +176,9 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                 ]
             }, 
             "autocomplete-list": {
-                "after": "autocomplete-sources", 
+                "after": [
+                    "autocomplete-sources"
+                ], 
                 "lang": [
                     "en"
                 ], 
@@ -160,11 +218,12 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                 }, 
                 "requires": [
                     "autocomplete-base", 
+                    "event-resize", 
                     "selector-css3", 
+                    "shim-plugin", 
                     "widget", 
                     "widget-position", 
-                    "widget-position-align", 
-                    "widget-stack"
+                    "widget-position-align"
                 ], 
                 "skinnable": true
             }, 
@@ -179,7 +238,13 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "autocomplete-base"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "autocomplete-base", 
+            "autocomplete-sources", 
+            "autocomplete-list", 
+            "autocomplete-plugin"
+        ]
     }, 
     "base": {
         "submodules": {
@@ -202,7 +267,12 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "pluginhost"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "base-base", 
+            "base-pluginhost", 
+            "base-build"
+        ]
     }, 
     "cache": {
         "submodules": {
@@ -223,7 +293,12 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "cache-base"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "cache-base", 
+            "cache-offline", 
+            "cache-plugin"
+        ]
     }, 
     "charts": {
         "requires": [
@@ -256,7 +331,14 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "arraylist"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "array-extras", 
+            "arraylist", 
+            "arraylist-add", 
+            "arraylist-filter", 
+            "array-invoke"
+        ]
     }, 
     "compat": {
         "requires": [
@@ -388,7 +470,14 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "dataschema-base"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "dataschema-base", 
+            "dataschema-json", 
+            "dataschema-xml", 
+            "dataschema-array", 
+            "dataschema-text"
+        ]
     }, 
     "datasource": {
         "submodules": {
@@ -402,6 +491,7 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
             "datasource-cache": {
                 "requires": [
                     "datasource-local", 
+                    "plugin", 
                     "cache-base"
                 ]
             }, 
@@ -453,7 +543,19 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "dataschema-xml"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "datasource-local", 
+            "datasource-io", 
+            "datasource-get", 
+            "datasource-function", 
+            "datasource-cache", 
+            "datasource-jsonschema", 
+            "datasource-xmlschema", 
+            "datasource-arrayschema", 
+            "datasource-textschema", 
+            "datasource-polling"
+        ]
     }, 
     "datatable": {
         "submodules": {
@@ -490,7 +592,13 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "recordset-sort"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "datatable-base", 
+            "datatable-datasource", 
+            "datatable-sort", 
+            "datatable-scroll"
+        ]
     }, 
     "datatype": {
         "submodules": {
@@ -577,27 +685,56 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "zh-Hant-HK", 
                     "zh-Hant-TW"
                 ], 
-                "requires": [
-                    "yui-base"
-                ], 
+                "submodules": {
+                    "datatype-date-format": {
+                        "path": "datatype/datatype-date-format-min.js"
+                    }, 
+                    "datatype-date-parse": {
+                        "path": "datatype/datatype-date-parse-min.js"
+                    }
+                }, 
                 "supersedes": [
+                    "datatype-date-format"
+                ], 
+                "use2": [
+                    "datatype-date-parse", 
                     "datatype-date-format"
                 ]
             }, 
             "datatype-number": {
-                "requires": [
-                    "yui-base"
+                "submodules": {
+                    "datatype-number-format": {
+                        "path": "datatype/datatype-number-format-min.js"
+                    }, 
+                    "datatype-number-parse": {
+                        "path": "datatype/datatype-number-parse-min.js"
+                    }
+                }, 
+                "use": [
+                    "datatype-number-parse", 
+                    "datatype-number-format"
                 ]
             }, 
             "datatype-xml": {
-                "requires": [
-                    "yui-base"
+                "submodules": {
+                    "datatype-xml-format": {
+                        "path": "datatype/datatype-xml-format-min.js"
+                    }, 
+                    "datatype-xml-parse": {
+                        "path": "datatype/datatype-xml-parse-min.js"
+                    }
+                }, 
+                "use": [
+                    "datatype-xml-parse", 
+                    "datatype-xml-format"
                 ]
             }
-        }
-    }, 
-    "datatype-date-format": {
-        "path": "datatype/datatype-date-format-min.js"
+        }, 
+        "use": [
+            "datatype-number", 
+            "datatype-date", 
+            "datatype-xml"
+        ]
     }, 
     "dd": {
         "plugins": {
@@ -616,7 +753,8 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                 }, 
                 "requires": [
                     "dd-drag", 
-                    "event-move"
+                    "event-synthetic", 
+                    "event-gestures"
                 ]
             }, 
             "dd-plugin": {
@@ -668,6 +806,7 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
             }, 
             "dd-drop": {
                 "requires": [
+                    "dd-drag", 
                     "dd-ddm-drop"
                 ]
             }, 
@@ -681,7 +820,18 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "dd-drag"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "dd-ddm-base", 
+            "dd-ddm", 
+            "dd-ddm-drop", 
+            "dd-drag", 
+            "dd-proxy", 
+            "dd-constrain", 
+            "dd-drop", 
+            "dd-scroll", 
+            "dd-delegate"
+        ]
     }, 
     "dial": {
         "lang": [
@@ -693,6 +843,8 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
             "dd-drag", 
             "substitute", 
             "event-mouseenter", 
+            "event-move", 
+            "event-key", 
             "transition", 
             "intl"
         ], 
@@ -702,7 +854,7 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
         "plugins": {
             "dom-deprecated": {
                 "requires": [
-                    "dom-base"
+                    "dom-core"
                 ]
             }, 
             "dom-style-ie": {
@@ -740,54 +892,100 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "dom-style"
                 ]
             }, 
+            "selector-css2": {
+                "condition": {
+                    "name": "selector-css2", 
+                    "test": function (Y) {
+    var DOCUMENT = Y.config.doc,
+        ret = DOCUMENT && !('querySelectorAll' in DOCUMENT);
+
+    return ret;
+}, 
+                    "trigger": "selector"
+                }, 
+                "requires": [
+                    "selector-native"
+                ]
+            }, 
             "selector-css3": {
                 "requires": [
+                    "selector-native", 
                     "selector-css2"
                 ]
             }
         }, 
-        "requires": [
-            "oop"
-        ], 
         "submodules": {
+            "dom-attrs": {
+                "requires": [
+                    "dom-core"
+                ]
+            }, 
             "dom-base": {
                 "requires": [
-                    "oop"
+                    "dom-core", 
+                    "dom-attrs", 
+                    "dom-create", 
+                    "dom-class", 
+                    "dom-size"
+                ]
+            }, 
+            "dom-class": {
+                "requires": [
+                    "dom-core"
+                ]
+            }, 
+            "dom-core": {
+                "requires": [
+                    "oop", 
+                    "features"
+                ]
+            }, 
+            "dom-create": {
+                "requires": [
+                    "dom-core"
                 ]
             }, 
             "dom-screen": {
                 "requires": [
-                    "dom-base", 
+                    "dom-core", 
                     "dom-style"
+                ]
+            }, 
+            "dom-size": {
+                "requires": [
+                    "dom-core"
                 ]
             }, 
             "dom-style": {
                 "requires": [
-                    "dom-base"
+                    "dom-core"
                 ]
             }, 
             "selector": {
-                "requires": [
-                    "dom-base"
-                ]
-            }, 
-            "selector-css2": {
                 "requires": [
                     "selector-native"
                 ]
             }, 
             "selector-native": {
                 "requires": [
-                    "dom-base"
+                    "dom-core"
                 ]
             }
-        }
-    }, 
-    "dump": {
-        "requires": [
-            "yui-base"
+        }, 
+        "use": [
+            "dom-core", 
+            "dom-base", 
+            "dom-attrs", 
+            "dom-create", 
+            "dom-class", 
+            "dom-size", 
+            "dom-screen", 
+            "dom-style", 
+            "selector-native", 
+            "selector"
         ]
     }, 
+    "dump": {}, 
     "editor": {
         "submodules": {
             "createlink-base": {
@@ -811,7 +1009,7 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
             }, 
             "editor-br": {
                 "requires": [
-                    "node"
+                    "editor-base"
                 ]
             }, 
             "editor-lists": {
@@ -821,7 +1019,12 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
             }, 
             "editor-para": {
                 "requires": [
-                    "node"
+                    "editor-base"
+                ]
+            }, 
+            "editor-tab": {
+                "requires": [
+                    "editor-base"
                 ]
             }, 
             "exec-command": {
@@ -834,7 +1037,8 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "base", 
                     "node", 
                     "selector-css3", 
-                    "substitute"
+                    "substitute", 
+                    "yui-throttle"
                 ]
             }, 
             "selection": {
@@ -842,11 +1046,24 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "node"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "frame", 
+            "selection", 
+            "exec-command", 
+            "editor-base", 
+            "editor-para", 
+            "editor-br", 
+            "editor-bidi", 
+            "editor-tab", 
+            "createlink-base"
+        ]
     }, 
     "escape": {}, 
     "event": {
-        "after": "node-base", 
+        "after": [
+            "node-base"
+        ], 
         "plugins": {
             "event-base-ie": {
                 "after": [
@@ -872,7 +1089,9 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
         }, 
         "submodules": {
             "event-base": {
-                "after": "node-base", 
+                "after": [
+                    "node-base"
+                ], 
                 "requires": [
                     "event-custom-base"
                 ]
@@ -889,7 +1108,7 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
             }, 
             "event-hover": {
                 "requires": [
-                    "event-synthetic"
+                    "event-mouseenter"
                 ]
             }, 
             "event-key": {
@@ -904,12 +1123,12 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
             }, 
             "event-mousewheel": {
                 "requires": [
-                    "event-synthetic"
+                    "node-base"
                 ]
             }, 
             "event-resize": {
                 "requires": [
-                    "event-synthetic"
+                    "node-base"
                 ]
             }, 
             "event-synthetic": {
@@ -918,7 +1137,18 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "event-custom-complex"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "event-base", 
+            "event-delegate", 
+            "event-synthetic", 
+            "event-mousewheel", 
+            "event-mouseenter", 
+            "event-key", 
+            "event-focus", 
+            "event-resize", 
+            "event-hover"
+        ]
     }, 
     "event-custom": {
         "submodules": {
@@ -932,7 +1162,11 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "event-custom-base"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "event-custom-base", 
+            "event-custom-complex"
+        ]
     }, 
     "event-gestures": {
         "submodules": {
@@ -950,7 +1184,11 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "event-synthetic"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "event-flick", 
+            "event-move"
+        ]
     }, 
     "event-simulate": {
         "requires": [
@@ -978,7 +1216,11 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "text-wordbreak"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "highlight-base", 
+            "highlight-accentfold"
+        ]
     }, 
     "history": {
         "plugins": {
@@ -986,7 +1228,7 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                 "condition": {
                     "name": "history-hash-ie", 
                     "test": function (Y) {
-    var docMode = Y.config.doc.documentMode;
+    var docMode = Y.config.doc && Y.config.doc.documentMode;
 
     return Y.UA.ie && (!('onhashchange' in Y.config.win) ||
             !docMode || docMode < 8);
@@ -1001,9 +1243,6 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
         }, 
         "submodules": {
             "history-base": {
-                "after": [
-                    "history-deprecated"
-                ], 
                 "requires": [
                     "event-custom-complex"
                 ]
@@ -1028,11 +1267,12 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "node-base"
                 ]
             }
-        }
-    }, 
-    "history-deprecated": {
-        "requires": [
-            "node"
+        }, 
+        "use": [
+            "history-base", 
+            "history-hash", 
+            "history-hash-ie", 
+            "history-html5"
         ]
     }, 
     "imageloader": {
@@ -1051,18 +1291,15 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
     "io": {
         "submodules": {
             "io-base": {
-                "optional": [
-                    "querystring-stringify-simple"
-                ], 
                 "requires": [
-                    "event-custom-base"
+                    "event-custom-base", 
+                    "querystring-stringify-simple"
                 ]
             }, 
             "io-form": {
                 "requires": [
                     "io-base", 
-                    "node-base", 
-                    "node-style"
+                    "node-base"
                 ]
             }, 
             "io-queue": {
@@ -1083,21 +1320,24 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "datatype-xml"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "io-base", 
+            "io-xdr", 
+            "io-form", 
+            "io-upload-iframe", 
+            "io-queue"
+        ]
     }, 
     "json": {
         "submodules": {
-            "json-parse": {
-                "requires": [
-                    "yui-base"
-                ]
-            }, 
-            "json-stringify": {
-                "requires": [
-                    "yui-base"
-                ]
-            }
-        }
+            "json-parse": {}, 
+            "json-stringify": {}
+        }, 
+        "use": [
+            "json-parse", 
+            "json-stringify"
+        ]
     }, 
     "jsonp": {
         "plugins": {
@@ -1129,7 +1369,12 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "loader-base"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "loader-base", 
+            "loader-rollup", 
+            "loader-yui3"
+        ]
     }, 
     "node": {
         "plugins": {
@@ -1195,7 +1440,14 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "node-base"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "node-base", 
+            "node-event-delegate", 
+            "node-pluginhost", 
+            "node-screen", 
+            "node-style"
+        ]
     }, 
     "node-flick": {
         "requires": [
@@ -1242,6 +1494,14 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
         "skinnable": true
     }, 
     "plugin": {
+        "plugins": {
+            "pluginattr": {
+                "path": "plugin/pluginattr-min.js", 
+                "requires": [
+                    "plugin"
+                ]
+            }
+        }, 
         "requires": [
             "base-base"
         ]
@@ -1258,7 +1518,11 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "pluginhost-base"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "pluginhost-base", 
+            "pluginhost-config"
+        ]
     }, 
     "profiler": {
         "requires": [
@@ -1278,7 +1542,11 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "yui-base"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "querystring-parse", 
+            "querystring-stringify"
+        ]
     }, 
     "querystring-parse-simple": {
         "path": "querystring/querystring-parse-simple-min.js", 
@@ -1295,12 +1563,6 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
     "queue-promote": {
         "requires": [
             "yui-base"
-        ]
-    }, 
-    "queue-run": {
-        "path": "async-queue/async-queue-min.js", 
-        "requires": [
-            "event-custom"
         ]
     }, 
     "recordset": {
@@ -1331,12 +1593,30 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "plugin"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "recordset-base", 
+            "recordset-sort", 
+            "recordset-filter", 
+            "recordset-indexer"
+        ]
     }, 
     "resize": {
+        "plugins": {
+            "resize-plugin": {
+                "optional": [
+                    "resize-constrain"
+                ], 
+                "requires": [
+                    "resize-base", 
+                    "plugin"
+                ]
+            }
+        }, 
         "submodules": {
             "resize-base": {
                 "requires": [
+                    "base", 
                     "widget", 
                     "substitute", 
                     "event", 
@@ -1359,7 +1639,12 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "resize-base"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "resize-base", 
+            "resize-proxy", 
+            "resize-constrain"
+        ]
     }, 
     "scrollview": {
         "plugins": {
@@ -1391,6 +1676,8 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
             "scrollview-scrollbars": {
                 "path": "scrollview/scrollview-scrollbars-min.js", 
                 "requires": [
+                    "classnamemanager", 
+                    "transition", 
                     "plugin"
                 ], 
                 "skinnable": true
@@ -1428,13 +1715,20 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "slider-base"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "slider-base", 
+            "slider-value-range", 
+            "clickable-rail", 
+            "range-slider"
+        ]
     }, 
     "sortable": {
         "plugins": {
             "sortable-scroll": {
                 "requires": [
-                    "dd-scroll"
+                    "dd-scroll", 
+                    "sortable"
                 ]
             }
         }, 
@@ -1444,11 +1738,7 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
             "dd-proxy"
         ]
     }, 
-    "stylesheet": {
-        "requires": [
-            "yui-base"
-        ]
-    }, 
+    "stylesheet": {}, 
     "substitute": {
         "optional": [
             "dump"
@@ -1489,10 +1779,10 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
     }, 
     "test": {
         "requires": [
+            "event-simulate", 
+            "event-custom", 
             "substitute", 
-            "node", 
-            "json", 
-            "event-simulate"
+            "json-stringify"
         ], 
         "skinnable": true
     }, 
@@ -1512,7 +1802,11 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "text-data-wordbreak"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "text-accentfold", 
+            "text-wordbreak"
+        ]
     }, 
     "transition": {
         "submodules": {
@@ -1527,7 +1821,11 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "node-style"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "transition-native", 
+            "transition-timer"
+        ]
     }, 
     "uploader": {
         "requires": [
@@ -1622,7 +1920,13 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "node-event-delegate"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "widget-base", 
+            "widget-htmlparser", 
+            "widget-uievents", 
+            "widget-skin"
+        ]
     }, 
     "widget-anim": {
         "requires": [
@@ -1677,15 +1981,37 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
                     "yui-base"
                 ]
             }, 
-            "yui-throttle": {
-                "requires": [
-                    "yui-base"
+            "yui-rls": {
+                "use": [
+                    "yui-base", 
+                    "get", 
+                    "features", 
+                    "intl-base", 
+                    "rls", 
+                    "yui-log", 
+                    "yui-later"
                 ]
             }
-        }
+        }, 
+        "use": [
+            "yui-base", 
+            "get", 
+            "features", 
+            "intl-base", 
+            "yui-log", 
+            "yui-later", 
+            "loader-base", 
+            "loader-rollup", 
+            "loader-yui3"
+        ]
+    }, 
+    "yui-throttle": {
+        "requires": [
+            "yui-base"
+        ]
     }
 };
-YUI.Env[Y.version].md5 = 'b617cbd6aaa458656fb7fc88af07926d';
+YUI.Env[Y.version].md5 = 'e16caab45651ef582690346921582645';
 
 
 }, '@VERSION@' ,{requires:['loader-base']});

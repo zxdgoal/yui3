@@ -13,10 +13,10 @@ if (!YUI.Env[Y.version]) {
             BUILD = '/build/',
             ROOT = VERSION + BUILD,
             CDN_BASE = Y.Env.base,
-            GALLERY_VERSION = 'gallery-2011.02.16-20-31',
+            GALLERY_VERSION = 'gallery-2011.06.08-20-04',
             TNT = '2in3',
             TNT_VERSION = '4',
-            YUI2_VERSION = '2.8.2',
+            YUI2_VERSION = '2.9.0',
             COMBO_BASE = CDN_BASE + 'combo?',
             META = { version: VERSION,
                               root: ROOT,
@@ -440,9 +440,9 @@ Y.Loader = function(o) {
      * Should we allow rollups
      * @property allowRollup
      * @type boolean
-     * @default true
+     * @default false
      */
-    self.allowRollup = true;
+    self.allowRollup = false;
 
     /**
      * A filter to apply to result urls.  This filter will modify the default
@@ -556,14 +556,16 @@ Y.Loader = function(o) {
     cache = GLOBAL_ENV._renderedMods;
 
     if (cache) {
-        oeach(cache, function(v, k) {
-            self.moduleInfo[k] = Y.merge(v);
+        oeach(cache, function modCache(v, k) {
+            //self.moduleInfo[k] = Y.merge(v);
+            self.moduleInfo[k] = v;
         });
 
         cache = GLOBAL_ENV._conditions;
 
-        oeach(cache, function(v, k) {
-            self.conditions[k] = Y.merge(v);
+        oeach(cache, function condCache(v, k) {
+            //self.conditions[k] = Y.merge(v);
+            self.conditions[k] = v;
         });
 
     } else {
@@ -571,8 +573,10 @@ Y.Loader = function(o) {
     }
 
     if (!GLOBAL_ENV._renderedMods) {
-        GLOBAL_ENV._renderedMods = Y.merge(self.moduleInfo);
-        GLOBAL_ENV._conditions = Y.merge(self.conditions);
+        //GLOBAL_ENV._renderedMods = Y.merge(self.moduleInfo);
+        //GLOBAL_ENV._conditions = Y.merge(self.conditions);
+        GLOBAL_ENV._renderedMods = self.moduleInfo;
+        GLOBAL_ENV._conditions = self.conditions;
     }
 
     self._inspectPage();
@@ -580,6 +584,12 @@ Y.Loader = function(o) {
     self._internal = false;
 
     self._config(o);
+
+    self.testresults = null;
+
+    if (Y.config.tests) {
+        self.testresults = Y.config.tests;
+    }
 
     /**
      * List of rollup files found in the library metadata
@@ -680,7 +690,9 @@ Y.Loader.prototype = {
                if (m) {
                    if (!m._inspected && req && mr.length != req.length) {
                        // console.log('deleting ' + m.name);
+                       // m.requres = YObject.keys(Y.merge(YArray.hash(req), YArray.hash(mr)));
                        delete m.expanded;
+                       // delete m.expanded_map;
                    }
                } else {
                    m = this.addModule(v.details, k);
@@ -698,13 +710,7 @@ Y.Loader.prototype = {
             info = this.moduleInfo,
             m = info[mod1],
             other = info[mod2];
-            // key = mod1 + mod2;
 
-        // if (this.tested[key]) {
-            // return this.tested[key];
-        // }
-
-        // if (loaded[mod2] || !m || !other) {
         if (!m || !other) {
             return false;
         }
@@ -806,6 +812,10 @@ Y.Loader.prototype = {
             }
         }
 
+        if (self.lang) {
+            self.require('intl-base', 'intl');
+        }
+
     },
 
     /**
@@ -856,7 +866,7 @@ Y.Loader.prototype = {
                     path: (parent || pkg) + '/' + sinf.base + skin +
                           '/' + mod + '.css',
                     ext: ext
-                });
+                }, name);
 
             }
         }
@@ -864,7 +874,8 @@ Y.Loader.prototype = {
         return name;
     },
 
-    /** Add a new module group
+    /**
+     * Add a new module group
      * <dl>
      *   <dt>name:</dt>      <dd>required, the group name</dd>
      *   <dt>base:</dt>      <dd>The base dir for this module group</dd>
@@ -900,7 +911,8 @@ Y.Loader.prototype = {
         }
     },
 
-    /** Add a new module to the component metadata.
+    /**
+     * Add a new module to the component metadata.
      * <dl>
      *     <dt>name:</dt>       <dd>required, the component name</dd>
      *     <dt>type:</dt>       <dd>required, the component type (js or css)
@@ -952,8 +964,8 @@ Y.Loader.prototype = {
      * the object passed in did not provide all required attributes.
      */
     addModule: function(o, name) {
-
         name = name || o.name;
+
         o.name = name;
 
         if (!o || !o.name) {
@@ -967,7 +979,6 @@ Y.Loader.prototype = {
         if (!o.path && !o.fullpath) {
             o.path = _path(name, name, o.type);
         }
-
         o.supersedes = o.supersedes || o.use;
 
         o.ext = ('ext' in o) ? o.ext : (this._internal) ? false : true;
@@ -1082,8 +1093,11 @@ Y.Loader.prototype = {
                     l++;
                 }
             }
-            o.supersedes = YObject.keys(YArray.hash(sup));
-            o.rollup = (l < 4) ? l : Math.min(l - 1, 4);
+            //o.supersedes = YObject.keys(YArray.hash(sup));
+            o.supersedes = YArray.dedupe(sup);
+            if (this.allowRollup) {
+                o.rollup = (l < 4) ? l : Math.min(l - 1, 4);
+            }
         }
 
         plugins = o.plugins;
@@ -1151,7 +1165,43 @@ Y.Loader.prototype = {
     require: function(what) {
         var a = (typeof what === 'string') ? arguments : what;
         this.dirty = true;
-        Y.mix(this.required, YArray.hash(a));
+        this.required = Y.merge(this.required, YArray.hash(a));
+
+        this._explodeRollups();
+    },
+    /**
+    * Grab all the items that were asked for, check to see if the Loader
+    * meta-data contains a "use" array. If it doesm remove the asked item and replace it with 
+    * the content of the "use".
+    * This will make asking for: "dd"
+    * Actually ask for: "dd-ddm-base,dd-ddm,dd-ddm-drop,dd-drag,dd-proxy,dd-constrain,dd-drop,dd-scroll,dd-drop-plugin"
+    * @private
+    * @method _explodeRollups
+    */
+    _explodeRollups: function() {
+        var self = this,
+        r = self.required;
+        if (!self.allowRollup) {
+            oeach(r, function(v, name) {
+                m = self.getModule(name);
+                if (m && m.use) {
+                    delete r[name];
+                    YArray.each(m.use, function(v) {
+                        m = self.getModule(v);
+                        if (m && m.use) {
+                            delete r[v];
+                            YArray.each(m.use, function(v) {
+                                r[v] = true;
+                            });
+                        } else {
+                            r[v] = true;
+                        }
+                    });
+                }
+            });
+            self.required = r;
+        }
+
     },
 
     /**
@@ -1167,7 +1217,7 @@ Y.Loader.prototype = {
             return NO_REQUIREMENTS;
         }
 
-        var i, m, j, add, packName, lang,
+        var i, m, j, add, packName, lang, testresults = this.testresults,
             name = mod.name, cond, go,
             adddef = ON_PAGE[name] && ON_PAGE[name].details,
             d,
@@ -1178,6 +1228,8 @@ Y.Loader.prototype = {
             ftests = Y.Features && Y.Features.tests.load,
             hash;
 
+        // console.log(name);
+
         // pattern match leaves module stub that needs to be filled out
         if (mod.temp && adddef) {
             old_mod = mod;
@@ -1187,20 +1239,23 @@ Y.Loader.prototype = {
             delete mod.expanded;
         }
 
+        // console.log('cache: ' + mod.langCache + ' == ' + this.lang);
+
         // if (mod.expanded && (!mod.langCache || mod.langCache == this.lang)) {
         if (mod.expanded && (!this.lang || mod.langCache === this.lang)) {
             return mod.expanded;
         }
+        
 
         d = [];
         hash = {};
-
+        
         r = mod.requires;
         o = mod.optional;
 
 
         mod._parsed = true;
-
+        mod.langCache = this.lang;
 
         for (i = 0; i < r.length; i++) {
             if (!hash[r[i]]) {
@@ -1267,11 +1322,10 @@ Y.Loader.prototype = {
         cond = this.conditions[name];
 
         if (cond) {
-            if (this.testresults && ftests) {
-                oeach(this.testresults, function(result, id) {
+            if (testresults && ftests) {
+                oeach(testresults, function(result, id) {
                     var condmod = ftests[id].name;
                     if (!hash[condmod] && ftests[id].trigger == name) {
-                        // console.log(id, result);
                         if (result && ftests[id]) {
                             hash[condmod] = true;
                             d.push(condmod);
@@ -1320,13 +1374,11 @@ Y.Loader.prototype = {
 
             if (mod.lang && !mod.langPack && Y.Intl) {
                 lang = Y.Intl.lookupBestLang(this.lang || ROOT_LANG, mod.lang);
-                mod.langCache = this.lang;
                 packName = this.getLangPackName(lang, name);
                 if (packName) {
                     d.unshift(packName);
                 }
             }
-
             d.unshift(INTL);
         }
 
@@ -1392,6 +1444,8 @@ Y.Loader.prototype = {
 
             if (this.allowRollup) {
                 this._rollup();
+            } else {
+                this._explodeRollups();
             }
             this._reduce();
             this._sort();
@@ -1441,7 +1495,8 @@ Y.Loader.prototype = {
                 if (m) {
 
                     // remove dups
-                    m.requires = YObject.keys(YArray.hash(m.requires));
+                    //m.requires = YObject.keys(YArray.hash(m.requires));
+                    m.requires = YArray.dedupe(m.requires);
 
                     // Create lang pack modules
                     if (m.lang && m.lang.length) {
@@ -1500,7 +1555,6 @@ Y.Loader.prototype = {
     getLangPackName: function(lang, mname) {
         return ('lang/' + mname + ((lang) ? '_' + lang : ''));
     },
-
     /**
      * Inspects the required modules list looking for additional
      * dependencies.  Expands the required list to include all
@@ -1514,7 +1568,7 @@ Y.Loader.prototype = {
 
         // the setup phase is over, all modules have been created
         self.dirty = false;
-
+        
         oeach(r, function(v, name) {
             if (!done[name]) {
                 done[name] = true;
@@ -1701,7 +1755,6 @@ Y.Loader.prototype = {
             done = {},
             p = 0, l, a, b, j, k, moved, doneKey;
 
-
         // keep going until we make a pass without moving anything
         for (;;) {
 
@@ -1758,7 +1811,6 @@ Y.Loader.prototype = {
         }
 
         this.sorted = s;
-
     },
 
     partial: function(partial, o, type) {
@@ -1926,7 +1978,7 @@ Y.Loader.prototype = {
                         comboSource = group.comboBase;
                     }
 
-                    if (group.root) {
+                    if ("root" in group && L.isValue(group.root)) {
                         m.root = group.root;
                     }
 
@@ -1950,7 +2002,7 @@ Y.Loader.prototype = {
                         // is found
                         if (m && (m.type === type) && (m.combine || !m.ext)) {
 
-                            frag = (m.root || self.root) + m.path;
+                            frag = ((L.isValue(m.root)) ? m.root : self.root) + m.path;
 
                             if ((url !== j) && (i < (len - 1)) &&
                             ((frag.length + url.length) > self.maxURLLength)) {

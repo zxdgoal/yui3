@@ -521,7 +521,7 @@ ChartBase.prototype = {
             node.set("innerHTML", msg);
             node.setStyle("top", y + "px");
             node.setStyle("left", x + "px");
-            node.removeClass("yui3-widget-hidden");
+            node.setStyle("visibility", "visible");
         }
     },
 
@@ -553,7 +553,7 @@ ChartBase.prototype = {
         node.set("innerHTML", "");
         node.setStyle("left", -10000);
         node.setStyle("top", -10000);
-        node.addClass("yui3-widget-hidden");
+        node.setStyle("visibility", "hidden");
     },
 
     /**
@@ -561,8 +561,17 @@ ChartBase.prototype = {
      */
     _addTooltip: function()
     {
-        var tt = this.get("tooltip");
-        this.get("contentBox").appendChild(tt.node);
+        var tt = this.get("tooltip"),
+            id = this.get("id") + "_tooltip",
+            cb = this.get("contentBox"),
+            oldNode = document.getElementById(id);
+        if(oldNode)
+        {
+            cb.removeChild(oldNode);
+        }
+        tt.node.setAttribute("id", id);
+        tt.node.setStyle("visibility", "hidden");
+        cb.appendChild(tt.node);
     },
 
     /**
@@ -572,31 +581,39 @@ ChartBase.prototype = {
     {
         var tt = this._tooltip,
             i,
-            styles = val.styles,
+            styles,
+            node,
             props = {
                 markerLabelFunction:"markerLabelFunction",
                 planarLabelFunction:"planarLabelFunction",
                 showEvent:"showEvent",
                 hideEvent:"hideEvent",
                 markerEventHandler:"markerEventHandler",
-                planarEventHandler:"planarEventHandler"
+                planarEventHandler:"planarEventHandler",
+                show:"show"
             };
-        if(styles)
+        if(Y.Lang.isObject(val))
         {
-            for(i in styles)
+            styles = val.styles;
+            node = Y.one(val.node) || tt.node;
+            if(styles)
             {
-                if(styles.hasOwnProperty(i))
+                for(i in styles)
                 {
-                    tt.node.setStyle(i, styles[i]);
+                    if(styles.hasOwnProperty(i))
+                    {
+                        node.setStyle(i, styles[i]);
+                    }
                 }
             }
-        }
-        for(i in props)
-        {
-            if(val.hasOwnProperty(i))
+            for(i in props)
             {
-                tt[i] = val[i];
+                if(val.hasOwnProperty(i))
+                {
+                    tt[i] = val[i];
+                }
             }
+            tt.node = node;
         }
         return tt;
     },
@@ -642,7 +659,7 @@ ChartBase.prototype = {
         node.setStyle("pointerEvents", "none");
         node.setStyle("zIndex", 3);
         node.setStyle("whiteSpace", "noWrap");
-        node.addClass("yui3-widget-hidden");
+        node.setStyle("visibility", "hidden");
         tt.node = Y.one(node);
         this._tooltip = tt;
         return tt;
@@ -702,7 +719,7 @@ ChartBase.prototype = {
                 cb = this.get("contentBox");
             if(node && show)
             {
-                if(!cb.containes(node))
+                if(!cb.contains(node))
                 {
                     this._addTooltip();
                 }
