@@ -19,6 +19,10 @@ function Plots(cfg)
 
 Plots.prototype = {
     /**
+     * Storage for default marker styles.
+     *
+     * @property _plotDefaults
+     * @type Object
      * @private
      */
     _plotDefaults: null,
@@ -35,7 +39,8 @@ Plots.prototype = {
 		{
 			return;
 		}
-        var style = Y.clone(this.get("styles").marker),
+        var isNumber = Y.Lang.isNumber,
+            style = Y.clone(this.get("styles").marker),
             w = style.width,
             h = style.height,
             xcoords = this.get("xcoords"),
@@ -61,12 +66,11 @@ Plots.prototype = {
         this._createMarkerCache();
         for(; i < len; ++i)
         {
-            top = (ycoords[i] - offsetHeight);
-            left = (xcoords[i] - offsetWidth);            
-            if(!top || !left || top === undefined || left === undefined || top == "undefined" || left == "undefined" || isNaN(top) || isNaN(left))
+            top = parseFloat(ycoords[i] - offsetHeight);
+            left = parseFloat(xcoords[i] - offsetWidth);            
+            if(!isNumber(left) || !isNumber(top))
             {
                 this._markers.push(null);
-                this._graphicNodes.push(null);
                 continue;
             }
             if(fillColors)
@@ -87,7 +91,7 @@ Plots.prototype = {
 
     /**
      * Gets the default values for series that use the utility. This method is used by
-     * the class' <code>styles</code> attribute's getter to get build default values.
+     * the class' `styles` attribute's getter to get build default values.
      *
      * @method _getPlotDefaults
      * @return Object
@@ -119,6 +123,8 @@ Plots.prototype = {
     /**
      * Collection of markers to be used in the series.
      *
+     * @property _markers
+     * @type Array
      * @private
      */
     _markers: null,
@@ -126,6 +132,8 @@ Plots.prototype = {
     /**
      * Collection of markers to be re-used on a series redraw.
      *
+     * @property _markerCache
+     * @type Array
      * @private
      */
     _markerCache: null,
@@ -169,7 +177,6 @@ Plots.prototype = {
             marker = this._createMarker(styles, order, index);
         }
         this._markers.push(marker);
-        this._graphicNodes.push(marker.parentNode);
         return marker;
     },   
     
@@ -212,7 +219,6 @@ Plots.prototype = {
             this._markerCache = [];
         }
         this._markers = [];
-        this._graphicNodes = [];
     },
     
     /**
@@ -253,15 +259,14 @@ Plots.prototype = {
         var len = this._markerCache.length,
             i = 0,
             marker;
-        for(; i < len; ++i)
+        while(this._markerCache.length > 0)
         {
-            marker = this._markerCache[i];
+            marker = this._markerCache.shift();
             if(marker)
             {
                 marker.destroy();
             }
         }
-        this._markerCache = [];
     },
 
     /**
@@ -278,13 +283,11 @@ Plots.prototype = {
         {
             var w,
                 h,
-                markerStyles,
                 styles = Y.clone(this.get("styles").marker),
                 state = this._getState(type),
                 xcoords = this.get("xcoords"),
                 ycoords = this.get("ycoords"),
                 marker = this._markers[i],
-                graphicNode = marker.parentNode;
                 markerStyles = state == "off" || !styles[state] ? styles : styles[state]; 
                 markerStyles.fill.color = this._getItemColor(markerStyles.fill.color, i);
                 markerStyles.border.color = this._getItemColor(markerStyles.border.color, i);
@@ -317,7 +320,7 @@ Plots.prototype = {
     },
 
     /**
-     * Method used by <code>styles</code> setter. Overrides base implementation.
+     * Method used by `styles` setter. Overrides base implementation.
      *
      * @method _setStyles
      * @param {Object} newStyles Hash of properties to update.
@@ -334,6 +337,8 @@ Plots.prototype = {
      * Combines new styles with existing styles.
      *
      * @method _parseMarkerStyles
+     * @param {Object} Object containing style properties for the marker.
+     * @return Object
      * @private
      */
     _parseMarkerStyles: function(val)
@@ -384,6 +389,8 @@ Plots.prototype = {
     },
     
     /**
+     * @property _statSyles
+     * @type Object
      * @private
      */
     _stateSyles: null

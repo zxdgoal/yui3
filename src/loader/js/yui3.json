@@ -268,7 +268,8 @@
     "charts": {
         "requires": [
             "dom", 
-            "datatype", 
+            "datatype-number", 
+            "datatype-date", 
             "event-custom", 
             "event-mouseenter", 
             "widget", 
@@ -1051,7 +1052,10 @@
             "name": "graphics-canvas", 
             "test": "graphics-canvas.js", 
             "trigger": "graphics"
-        }
+        }, 
+        "requires": [
+            "graphics"
+        ]
     }, 
     "graphics-canvas-default": {
         "condition": {
@@ -1065,7 +1069,10 @@
             "name": "graphics-svg", 
             "test": "graphics-svg.js", 
             "trigger": "graphics"
-        }
+        }, 
+        "requires": [
+            "graphics"
+        ]
     }, 
     "graphics-svg-default": {
         "condition": {
@@ -1079,7 +1086,10 @@
             "name": "graphics-vml", 
             "test": "graphics-vml.js", 
             "trigger": "graphics"
-        }
+        }, 
+        "requires": [
+            "graphics"
+        ]
     }, 
     "graphics-vml-default": {
         "condition": {
@@ -1383,11 +1393,6 @@
             "base-base"
         ]
     }, 
-    "pluginattr": {
-        "requires": [
-            "plugin"
-        ]
-    }, 
     "pluginhost": {
         "use": [
             "pluginhost-base", 
@@ -1551,6 +1556,11 @@
         }, 
         "requires": [
             "scrollview-base"
+        ]
+    }, 
+    "scrollview-list": {
+        "requires": [
+            "plugin"
         ]
     }, 
     "scrollview-paginator": {

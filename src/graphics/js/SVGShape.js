@@ -1,7 +1,10 @@
 /**
  * Base class for creating shapes.
  *
+ * @module graphics
  * @class SVGShape
+ * @constructor
+ * @param {Object} cfg (optional) Attribute configs
  */
 SVGShape = function(cfg)
 {
@@ -10,9 +13,13 @@ SVGShape = function(cfg)
 
 SVGShape.NAME = "svgShape";
 
-Y.extend(SVGShape, Y.BaseGraphic, {
+Y.extend(SVGShape, Y.BaseGraphic, Y.mix({
     /**
-     * @private
+     * Init method, invoked during construction.
+     * Calls `initializer` method.
+     *
+     * @method init
+     * @protected
      */
 	init: function()
 	{
@@ -78,7 +85,7 @@ Y.extend(SVGShape, Y.BaseGraphic, {
 	 * Set the position of the shape in page coordinates, regardless of how the node is positioned.
 	 *
 	 * @method setXY
-	 * @param {Array} Contains X & Y values for new position (coordinates are page-based)
+	 * @param {Array} Contains x & y values for new position (coordinates are page-based)
 	 */
 	setXY: function(xy)
 	{
@@ -164,8 +171,9 @@ Y.extend(SVGShape, Y.BaseGraphic, {
 	/**
 	 * Creates the dom node for the shape.
 	 *
-	 * @private
+     * @method createNode
 	 * @return HTMLElement
+	 * @private
 	 */
 	createNode: function()
 	{
@@ -183,8 +191,13 @@ Y.extend(SVGShape, Y.BaseGraphic, {
 			node.setAttribute("pointer-events", pointerEvents);
 		}
 	},
-
-	/**
+	
+    /**
+     * Parses event to determine if it is a dom interaction event.
+     *
+     * @method isMouseEvent
+     * @param {String} type Type of event
+     * @return Boolean
 	 * @private
 	 */
 	isMouseEvent: function(type)
@@ -197,6 +210,12 @@ Y.extend(SVGShape, Y.BaseGraphic, {
 	},
 	
 	/**
+     * Overrides default `before` method. Checks to see if its a dom interaction event. If so, 
+     * return an event attached to the `node` element. If not, return the normal functionality.
+     *
+     * @method before
+     * @param {String} type event type
+     * @param {Object} callback function
 	 * @private
 	 */
 	before: function(type, fn)
@@ -209,6 +228,12 @@ Y.extend(SVGShape, Y.BaseGraphic, {
 	},
 	
 	/**
+     * Overrides default `on` method. Checks to see if its a dom interaction event. If so, 
+     * return an event attached to the `node` element. If not, return the normal functionality.
+     *
+     * @method on
+     * @param {String} type event type
+     * @param {Object} callback function
 	 * @private
 	 */
 	on: function(type, fn)
@@ -221,6 +246,12 @@ Y.extend(SVGShape, Y.BaseGraphic, {
 	},
 	
 	/**
+     * Overrides default `after` method. Checks to see if its a dom interaction event. If so, 
+     * return an event attached to the `node` element. If not, return the normal functionality.
+     *
+     * @method after
+     * @param {String} type event type
+     * @param {Object} callback function
 	 * @private
 	 */
 	after: function(type, fn)
@@ -320,9 +351,9 @@ Y.extend(SVGShape, Y.BaseGraphic, {
 	},
 
 	/**
-	 * Returns a linear gradient fill
+	 * Creates a gradient fill
 	 *
-	 * @method _getLinearGradient
+	 * @method _setGradientFill
 	 * @param {String} type gradient type
 	 * @private
 	 */
@@ -339,14 +370,23 @@ Y.extend(SVGShape, Y.BaseGraphic, {
 			w = this.get("width"),
 			h = this.get("height"),
 			rotation = fill.rotation,
-			i,
+			radCon = Math.PI/180,
+			sinRadians = parseFloat(parseFloat(Math.sin(rotation * radCon)).toFixed(8)),
+			cosRadians = parseFloat(parseFloat(Math.cos(rotation * radCon)).toFixed(8)),
+            tanRadians = parseFloat(parseFloat(Math.tan(rotation * radCon)).toFixed(8)),
+			hyp = Math.sqrt((w * w) + (h * h)),
+            tx = (sinRadians * hyp),
+            ty = (cosRadians * hyp),
+            i,
 			len,
 			def,
 			stop,
+            x = this.get("x"),
+            y = this.get("y"),
 			x1 = "0%", 
 			x2 = "100%", 
-			y1 = "50%", 
-			y2 = "50%",
+			y1 = "0%", 
+			y2 = "0%",
 			cx = fill.cx,
 			cy = fill.cy,
 			fx = fill.fx,
@@ -354,14 +394,45 @@ Y.extend(SVGShape, Y.BaseGraphic, {
 			r = fill.r;
 		if(type == "linear")
 		{
-			gradientNode.setAttribute("gradientTransform", "rotate(" + rotation + "," + (w/2) + ", " + (h/2) + ")");
+            cx = w/2;
+            cy = h/2;
+            if(Math.abs(tanRadians) * w/2 >= h/2)
+            {
+                if(rotation < 180)
+                {
+                    y1 = 0;
+                    y2 = h;
+                }
+                else
+                {
+                    y1 = h;
+                    y2 = 0;
+                }
+                x1 = cx - ((cy - y1)/tanRadians);
+                x2 = cx - ((cy - y2)/tanRadians); 
+            }
+            else
+            {
+                if(rotation > 90 && rotation < 270)
+                {
+                    x1 = w;
+                    x2 = 0;
+                }
+                else
+                {
+                    x1 = 0;
+                    x2 = w;
+                }
+                y1 = ((tanRadians * (cx - x1)) - cy) * -1;
+                y2 = ((tanRadians * (cx - x2)) - cy) * -1;
+            }
+            gradientNode.setAttribute("spreadMethod", "pad");
 			gradientNode.setAttribute("width", w);
 			gradientNode.setAttribute("height", h);
-			gradientNode.setAttribute("x1", x1);
-			gradientNode.setAttribute("y1", y1);
-			gradientNode.setAttribute("x2", x2);
-			gradientNode.setAttribute("y2", y2);
-			gradientNode.setAttribute("gradientUnits", "userSpaceOnUse");
+            gradientNode.setAttribute("x1", Math.round(100 * x1/w) + "%");
+            gradientNode.setAttribute("y1", Math.round(100 * y1/h) + "%");
+            gradientNode.setAttribute("x2", Math.round(100 * x2/w) + "%");
+            gradientNode.setAttribute("y2", Math.round(100 * y2/h) + "%");
 		}
 		else
 		{
@@ -392,9 +463,15 @@ Y.extend(SVGShape, Y.BaseGraphic, {
 		}
 	},
 
-	/**
-	 * @private
-	 */
+    /**
+     * Sets the value of an attribute.
+     *
+     * @method set
+     * @param {String|Object} name The name of the attribute. Alternatively, an object of key value pairs can 
+     * be passed in to set multiple attributes at once.
+     * @param {Any} value The value to set the attribute to. This value is ignored if an object is received as 
+     * the name param.
+     */
 	set: function() 
 	{
 		var host = this;
@@ -444,10 +521,10 @@ Y.extend(SVGShape, Y.BaseGraphic, {
 	 },
 
 	/**
-	 * Applies a skew to the x-coordinate
+	 * Applies a skew to the y-coordinate
 	 *
-	 * @method skewX
-	 * @param {Number} x x-coordinate
+	 * @method skewY
+	 * @param {Number} y y-coordinate
 	 */
 	 skewY: function(y)
 	 {
@@ -455,16 +532,20 @@ Y.extend(SVGShape, Y.BaseGraphic, {
 	 },
 
 	/**
+     * Storage for `rotation` atribute.
+     *
+     * @property _rotation
+     * @type Number
 	 * @private
 	 */
 	 _rotation: 0,
 
-	 /**
-	  * Applies a rotation.
-	  *
-	  * @method rotate
-	  * @param
-	  */
+	/**
+	 * Applies a rotation.
+	 *
+	 * @method rotate
+	 * @param {Number} deg The degree of the rotation.
+	 */
 	 rotate: function(deg)
 	 {
 		this._rotation = deg;
@@ -486,13 +567,24 @@ Y.extend(SVGShape, Y.BaseGraphic, {
 	 * Applies a matrix transformation
 	 *
 	 * @method matrix
+     * @param {Number} a
+     * @param {Number} b
+     * @param {Number} c
+     * @param {Number} d
+     * @param {Number} e
+     * @param {Number} f
 	 */
 	matrix: function(a, b, c, d, e, f)
 	{
 		this._addTransform("matrix", arguments);
 	},
 
-	/**
+    /**
+     * Adds a transform to the shape.
+     *
+     * @method _addTransform
+     * @param {String} type The transform being applied.
+     * @param {Array} args The arguments for the transform.
 	 * @private
 	 */
 	_addTransform: function(type, args)
@@ -502,10 +594,16 @@ Y.extend(SVGShape, Y.BaseGraphic, {
 			this._transformArgs = {};
 		}
 		this._transformArgs[type] = Array.prototype.slice.call(args, 0);
-		this._updateTransform();
+		if(this.initialized)
+        {
+            this._updateTransform();
+        }
 	},
 
 	/**
+     * Applies all transforms.
+     *
+     * @method _updateTransform
 	 * @private
 	 */
 	_updateTransform: function()
@@ -558,7 +656,7 @@ Y.extend(SVGShape, Y.BaseGraphic, {
 	},
 
 	/**
-	 * Updates the shape.
+	 * Draws the shape.
 	 *
 	 * @method _draw
 	 * @private
@@ -578,10 +676,10 @@ Y.extend(SVGShape, Y.BaseGraphic, {
 	},
 
 	/**
-	 * Change event listener
-	 *
+     * Updates `Shape` based on attribute changes.
+     *
+     * @method _updateHandler
 	 * @private
-	 * @method _updateHandler
 	 */
 	_updateHandler: function(e)
 	{
@@ -591,6 +689,8 @@ Y.extend(SVGShape, Y.BaseGraphic, {
 	/**
 	 * Storage for translateX
 	 *
+     * @property _translateX
+     * @type Number
 	 * @private
 	 */
 	_translateX: 0,
@@ -598,6 +698,8 @@ Y.extend(SVGShape, Y.BaseGraphic, {
 	/**
 	 * Storage for translateY
 	 *
+     * @property _translateY
+     * @type Number
 	 * @private
 	 */
 	_translateY: 0,
@@ -703,6 +805,11 @@ Y.extend(SVGShape, Y.BaseGraphic, {
         return (toy - (x - tox) * sinRadians + (y - toy) * cosRadians);
     },
 
+    /**
+     * Destroys the instance.
+     *
+     * @method destroy
+     */
     destroy: function()
     {
         if(this._graphic && this._graphic._contentNode)
@@ -710,7 +817,7 @@ Y.extend(SVGShape, Y.BaseGraphic, {
             this._graphic._contentNode.removeChild(this.node);
         }
     }
- });
+ }, Y.SVGDrawing.prototype));
 	
 SVGShape.ATTRS = {
 	/**
@@ -1029,7 +1136,7 @@ SVGShape.ATTRS = {
 	/**
 	 * Reference to the parent graphic instance
 	 *
-	 * @graphic
+	 * @attribute graphic
 	 * @type SVGGraphic
 	 * @readOnly
 	 */

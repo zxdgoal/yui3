@@ -1,4 +1,6 @@
-all:
+all: build test
+
+build:
 	ant all
 
 meta:
@@ -9,7 +11,7 @@ check:
 
 tests: test
 
-update:
+gallery:
 	./scripts/fetch_gallery_version.js
 
 deps:

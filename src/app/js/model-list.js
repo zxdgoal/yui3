@@ -87,7 +87,7 @@ Y.ModelList = Y.extend(ModelList, Y.Base, {
     This property is `null` by default, and is intended to be overridden in a
     subclass or specified as a config property at instantiation time. It will be
     used to create model instances automatically based on attribute hashes
-    passed to the `add()`, `create()`, and `remove()` methods.
+    passed to the `add()`, `create()`, and `refresh()` methods.
 
     @property model
     @type Model
@@ -390,6 +390,11 @@ Y.ModelList = Y.extend(ModelList, Y.Base, {
                 }, this)
             });
 
+        // Sort the models in the facade before firing the refresh event.
+        if (this.comparator) {
+            facade.models.sort(Y.bind(this._sort, this));
+        }
+
         options.silent ? this._defRefreshFn(facade) :
                 this.fire(EVT_REFRESH, facade);
 
@@ -433,22 +438,16 @@ Y.ModelList = Y.extend(ModelList, Y.Base, {
     @chainable
     **/
     sort: function (options) {
-        var comparator = this.comparator,
-            models     = this._items.concat(),
+        var models = this._items.concat(),
             facade;
 
-        if (!comparator) {
+        if (!this.comparator) {
             return this;
         }
 
         options || (options = {});
 
-        models.sort(function (a, b) {
-            var aValue = comparator(a),
-                bValue = comparator(b);
-
-            return aValue < bValue ? -1 : (aValue > bValue ? 1 : 0);
-        });
+        models.sort(Y.bind(this._sort, this));
 
         facade = Y.merge(options, {
             models: models,
@@ -618,7 +617,7 @@ Y.ModelList = Y.extend(ModelList, Y.Base, {
     _findIndex: function (model) {
         var comparator = this.comparator,
             items      = this._items,
-            max        = items.length - 1,
+            max        = items.length,
             min        = 0,
             item, middle, needle;
 
@@ -629,10 +628,10 @@ Y.ModelList = Y.extend(ModelList, Y.Base, {
         // Perform an iterative binary search to determine the correct position
         // based on the return value of the `comparator` function.
         while (min < max) {
-            middle = (min + max) / 2;
+            middle = (min + max) >> 1; // Divide by two and discard remainder.
             item   = items[middle];
 
-            if (item && comparator(item) < needle) {
+            if (comparator(item) < needle) {
                 min = middle + 1;
             } else {
                 max = middle;
@@ -664,16 +663,32 @@ Y.ModelList = Y.extend(ModelList, Y.Base, {
             Y.error('Model not in list.');
             return;
         }
-    
+
         facade = Y.merge(options, {
             index: index,
             model: model
         });
-    
+
         options.silent ? this._defRemoveFn(facade) :
                 this.fire(EVT_REMOVE, facade);
 
         return model;
+    },
+
+    /**
+    Array sort function used by `sort()` to re-sort the models in the list.
+
+    @method _sort
+    @param {Model} a First model to compare.
+    @param {Model} b Second model to compare.
+    @return {Number} `-1` if _a_ is less than _b_, `0` if equal, `1` if greater.
+    @protected
+    **/
+    _sort: function (a, b) {
+        var aValue = this.comparator(a),
+            bValue = this.comparator(b);
+
+        return aValue < bValue ? -1 : (aValue > bValue ? 1 : 0);
     },
 
     // -- Event Handlers -------------------------------------------------------

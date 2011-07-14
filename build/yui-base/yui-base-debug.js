@@ -222,7 +222,12 @@ proto = {
             loader._config(o);
         }
     },
-
+    /**
+    * Old way to apply a config to the instance (calls `applyConfig` under the hood)
+    * @private
+    * @method _config
+    * @param {Object} o The config to apply
+    */
     _config: function(o) {
         this.applyConfig(o);
     },
@@ -230,6 +235,7 @@ proto = {
     /**
      * Initialize this YUI instance
      * @private
+     * @method _init
      */
     _init: function() {
         var filter,
@@ -3929,7 +3935,7 @@ Y.Get = {
     /**
      * The number of request required before an automatic purge.
      * Can be configured via the 'purgethreshold' config
-     * property PURGE_THRESH
+     * @property PURGE_THRESH
      * @static
      * @type int
      * @default 20
@@ -4309,8 +4315,8 @@ add('load', '3', {
 });
 // 0
 add('load', '4', {
-    "name": "widget-base-ie", 
-    "trigger": "widget-base", 
+    "name": "scrollview-base-ie", 
+    "trigger": "scrollview-base", 
     "ua": "ie"
 });
 // autocomplete-list-keys-sniff.js

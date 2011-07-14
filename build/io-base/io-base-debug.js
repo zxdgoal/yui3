@@ -36,9 +36,11 @@ YUI.add('io-base', function(Y) {
 	* @return object
 	*/
 	function IO () {
+
 		var io = this;
-		
-		this._init(io);
+
+		io._uid = 'io:' + _i++;
+		io._init(io);
 		Y.io._map[io._uid] = io;
 	}
 
@@ -46,15 +48,6 @@ YUI.add('io-base', function(Y) {
 		//--------------------------------------
 		//  Properties
 		//--------------------------------------
-	   /**
-		* @description Unique id assigned each IO instance.
-		*
-		* @property _id
-		* @private
-		* @static
-		* @type int
-		*/
-		_uid: 'io:' + _i++,
 
 	   /**
 		* @description A counter that increments for each transaction.
@@ -564,13 +557,7 @@ YUI.add('io-base', function(Y) {
 				}
 				else {
 					// Serialize HTML form data into a key-value string.
-					f = io._serialize(c.form, d);
-					if (m === 'POST' || m === 'PUT') {
-						d = f;
-					}
-					else if (m === 'GET') {
-						u = io._concat(u, f);
-					}
+					d = io._serialize(c.form, d);
 				}
 			}
 
@@ -595,7 +582,7 @@ YUI.add('io-base', function(Y) {
 
 			if (o.t) {
 				// Cross-domain request or custom transport configured.
-				return io.xdr(uri, o, c);
+				return io.xdr(u, o, c);
 			}
 
 			if (!s) {
@@ -617,7 +604,7 @@ YUI.add('io-base', function(Y) {
 					}
 				}
 
-				// Using "null" with HTTP POST will  result in a request
+				// Using "null" with HTTP POST will result in a request
 				// with no Content-Length header defined.
 				o.c.send(d);
 

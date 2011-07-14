@@ -20,7 +20,7 @@ controllerSuite = new Y.Test.Suite({
     name: 'Controller',
 
     setUp: function () {
-        this.oldPath = Y.config.win.location.pathname;
+        this.oldPath = Y.config.win.location.toString();
 
         if (!html5) {
             Y.config.win.location.hash = '';
@@ -256,6 +256,34 @@ controllerSuite.add(new Y.Test.Case({
         controller.save('/save');
 
         this.wait(1000);
+    },
+
+    'consecutive save() calls should dispatch to the correct routes': function () {
+        var paths      = [],
+            test       = this,
+            controller = this.controller = new Y.Controller();
+
+        controller.route('/one', function (req) {
+            paths.push(req.path);
+        });
+
+        controller.route('/two', function (req) {
+            paths.push(req.path);
+        });
+
+        controller.route('/three', function (req) {
+            paths.push(req.path);
+
+            test.resume(function () {
+                ArrayAssert.itemsAreSame(['/one', '/two', '/three'], paths);
+            });
+        });
+
+        controller.save('/one');
+        controller.save('/two');
+        controller.save('/three');
+
+        this.wait(2000);
     },
 
     '_joinURL() should normalize / separators': function () {
@@ -767,6 +795,8 @@ modelSuite.add(new Y.Test.Case({
 
         model.save(opts);
 
+        Assert.areSame('foo', model.get('id'), "model id should be updated after save");
+
         model.sync = function (action) {
             calls += 1;
             Assert.areSame('update', action);
@@ -1175,6 +1205,23 @@ modelListSuite.add(new Y.Test.Case({
         Assert.areSame(2, calls);
     },
 
+    'create() should pass an error to the callback if one occurs': function () {
+        var calls = 0,
+            list  = this.createList(),
+            model = this.createModel();
+
+        model.sync = function (action, options, callback) {
+            callback('Oh noes!');
+        };
+
+        list.create(model, function (err) {
+            calls += 1;
+            Assert.areSame('Oh noes!', err);
+        });
+
+        Assert.areSame(1, calls);
+    },
+
     'get() should return an array of attribute values from all models in the list': function () {
         var list = this.createList();
 
@@ -1332,6 +1379,24 @@ modelListSuite.add(new Y.Test.Case({
         // And we should be able to re-add them.
         list.refresh(models);
         ArrayAssert.itemsAreSame(['zero', 'one'], list.get('foo'));
+    },
+
+    'refresh() should sort the new models in the list': function () {
+        var list = this.createList();
+
+        list.comparator = function (model) {
+            return model.get('bar');
+        };
+
+        list.refresh([
+            {foo: 'item 1', bar: 1},
+            {foo: 'item 4', bar: 4},
+            {foo: 'item 3', bar: 3},
+            {foo: 'item 5', bar: 5},
+            {foo: 'item 2', bar: 2}
+        ]);
+
+        ArrayAssert.itemsAreSame([1, 2, 3, 4, 5], list.get('bar'));
     },
 
     'remove() should remove a single model from the list': function () {
@@ -1566,6 +1631,37 @@ modelListSuite.add(new Y.Test.Case({
         Assert.areSame(2, calls);
     },
 
+    '`refresh` event facade should contain sorted models': function () {
+        var calls = 0,
+            list  = this.createList();
+
+        list.comparator = function (model) {
+            return model.get('bar');
+        };
+
+        list.once('refresh', function (e) {
+            var values = [];
+
+            calls += 1;
+
+            Y.Array.each(e.models, function (model) {
+                values.push(model.get('bar'));
+            });
+
+            ArrayAssert.itemsAreSame([1, 2, 3, 4, 5], values);
+        });
+
+        list.refresh([
+            {foo: 'item 1', bar: 1},
+            {foo: 'item 4', bar: 4},
+            {foo: 'item 3', bar: 3},
+            {foo: 'item 5', bar: 5},
+            {foo: 'item 2', bar: 2}
+        ]);
+
+        Assert.areSame(1, calls);
+    },
+
     '`refresh` event should be preventable': function () {
         var calls = 0,
             list  = this.createList();
@@ -1684,6 +1780,13 @@ viewSuite.add(new Y.Test.Case({
             view  = new Y.View({model: model});
 
         Assert.areSame(model, view.model);
+    },
+
+    'initializer should allow setting a model list reference at init': function () {
+        var modelList = new Y.ModelList(),
+            view      = new Y.View({modelList: modelList});
+
+        Assert.areSame(modelList, view.modelList);
     },
 
     'initializer should allow setting a template at init': function () {

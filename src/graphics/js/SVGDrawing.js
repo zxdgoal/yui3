@@ -7,11 +7,29 @@ var SHAPE = "svgShape",
 	SVGRect,
 	SVGPath,
 	SVGEllipse,
+    SVGPieSlice,
     DOCUMENT = Y.config.doc;
 
 function SVGDrawing(){}
 
+/**
+ * Set of drawing methods for SVG based classes.
+ *
+ * @module graphics
+ * @class SVGDrawing
+ * @constructor
+ */
 SVGDrawing.prototype = {
+    /**
+     * Indicates the type of shape
+     *
+     * @private
+     * @property _type
+     * @readOnly
+     * @type String
+     */
+    _type: "path",
+   
     /**
      * Draws a bezier curve.
      *
@@ -160,7 +178,9 @@ SVGDrawing.prototype = {
             cx,
             cy,
             i = 0,
-            diameter = radius * 2;
+            diameter = radius * 2,
+            currentArray,
+            pathArrayLen;
         yRadius = yRadius || radius;
         if(this._pathType != "M")
         {
@@ -299,14 +319,105 @@ SVGDrawing.prototype = {
         this._pathArray[pathArrayLen] = this._pathArray[pathArrayLen].concat([x, y]);
         this._trackSize(x, y);
     },
-
+ 
     /**
      * Completes a drawing operation. 
      *
      * @method end
      */
-    end: function() {
-        this._draw();
+    end: function()
+    {
+        this._closePath();
+        this._graphic.addToRedrawQueue(this);    
+    },
+
+    /**
+     * Clears the path.
+     *
+     * @method clear
+     */
+    clear: function()
+    {
+        this._left = 0;
+        this._right = 0;
+        this._top = 0;
+        this._bottom = 0;
+        this._pathArray = [];
+        this._path = "";
+    },
+
+    /**
+     * Draws the path.
+     *
+     * @method _closePath
+     * @private
+     */
+    _closePath: function()
+    {
+        var pathArray,
+            segmentArray,
+            pathType,
+            len,
+            val,
+            val2,
+            i,
+            path = "",
+            node = this.node,
+            tx = this.get("translateX"),
+            ty = this.get("translateY"),
+            left = this._left,
+            top = this._top,
+            fill = this.get("fill");
+        if(this._pathArray)
+        {
+            pathArray = this._pathArray.concat();
+            while(pathArray && pathArray.length > 0)
+            {
+                segmentArray = pathArray.shift();
+                len = segmentArray.length;
+                pathType = segmentArray[0];
+                path += " " + pathType + (segmentArray[1] - left);
+                switch(pathType)
+                {
+                    case "L" :
+                    case "M" :
+                    case "Q" :
+                        for(i = 2; i < len; ++i)
+                        {
+                            val = (i % 2 === 0) ? top : left;
+                            val = segmentArray[i] - val;
+                            path += ", " + val;
+                        }
+                    break;
+                    case "C" :
+                        for(i = 2; i < len; ++i)
+                        {
+                            val = (i % 2 === 0) ? top : left;
+                            val2 = segmentArray[i];
+                            val2 -= val;
+                            path += " " + val2;
+                        }
+                    break;
+
+                }
+            }
+            if(fill && fill.color)
+            {
+                path += 'z';
+            }
+            if(path)
+            {
+                node.setAttribute("d", path);
+            }
+            //Use transform to handle positioning.
+            this._transformArgs = this._transformArgs || {};
+            this._transformArgs.translate = [left + tx, top + ty];
+            
+            this._path = path;
+            this._fillChangeHandler();
+            this._strokeChangeHandler();
+            this._updateTransform();
+        }
     },
 
     /**

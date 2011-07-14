@@ -288,7 +288,8 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
     "charts": {
         "requires": [
             "dom", 
-            "datatype", 
+            "datatype-number", 
+            "datatype-date", 
             "event-custom", 
             "event-mouseenter", 
             "widget", 
@@ -1105,7 +1106,10 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
 	return (DOCUMENT && !DOCUMENT.implementation.hasFeature("http://www.w3.org/TR/SVG11/feature#BasicStructure", "1.1") && (canvas && canvas.getContext && canvas.getContext("2d")));
 }, 
             "trigger": "graphics"
-        }
+        }, 
+        "requires": [
+            "graphics"
+        ]
     }, 
     "graphics-canvas-default": {
         "condition": {
@@ -1126,7 +1130,10 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
 	return (DOCUMENT && DOCUMENT.implementation.hasFeature("http://www.w3.org/TR/SVG11/feature#BasicStructure", "1.1"));
 }, 
             "trigger": "graphics"
-        }
+        }, 
+        "requires": [
+            "graphics"
+        ]
     }, 
     "graphics-svg-default": {
         "condition": {
@@ -1147,7 +1154,10 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
     return (DOCUMENT && !DOCUMENT.implementation.hasFeature("http://www.w3.org/TR/SVG11/feature#BasicStructure", "1.1") && (!canvas || !canvas.getContext || !canvas.getContext("2d")));
 }, 
             "trigger": "graphics"
-        }
+        }, 
+        "requires": [
+            "graphics"
+        ]
     }, 
     "graphics-vml-default": {
         "condition": {
@@ -1460,11 +1470,6 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
             "base-base"
         ]
     }, 
-    "pluginattr": {
-        "requires": [
-            "plugin"
-        ]
-    }, 
     "pluginhost": {
         "use": [
             "pluginhost-base", 
@@ -1628,6 +1633,11 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
         }, 
         "requires": [
             "scrollview-base"
+        ]
+    }, 
+    "scrollview-list": {
+        "requires": [
+            "plugin"
         ]
     }, 
     "scrollview-paginator": {
@@ -1982,4 +1992,4 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
         ]
     }
 };
-YUI.Env[Y.version].md5 = 'ea3b697e30a4b7bf0c41e10e098f5bab';
+YUI.Env[Y.version].md5 = '20993ff9fea6bbdb5d6ad6a449ef95af';

@@ -1,12 +1,16 @@
 /**
  * Draws pie slices
+ *
+ * @module graphics
+ * @class CanvasPieSlice
+ * @constructor
  */
 CanvasPieSlice = function()
 {
 	CanvasPieSlice.superclass.constructor.apply(this, arguments);
 };
 CanvasPieSlice.NAME = "canvasPieSlice";
-Y.extend(CanvasPieSlice, Y.CanvasPath, {
+Y.extend(CanvasPieSlice, Y.CanvasShape, {
     /**
      * Indicates the type of shape
      *
@@ -22,7 +26,7 @@ Y.extend(CanvasPieSlice, Y.CanvasPath, {
 	 * @private
 	 * @method _updateHandler
 	 */
-	_updateHandler: function(e)
+	_draw: function(e)
 	{
         var x = this.get("cx"),
             y = this.get("cy"),
@@ -34,11 +38,11 @@ Y.extend(CanvasPieSlice, Y.CanvasPath, {
         this._right = radius;
         this._top = y;
         this._bottom = radius;
-        this.drawWedge(x, y, startAngle, arc, radius)
-		this._draw();
+        this.drawWedge(x, y, startAngle, arc, radius);
+		this.end();
 	}
  });
-CanvasPieSlice.ATTRS = Y.mix(Y.CanvasPath.ATTRS, {
+CanvasPieSlice.ATTRS = Y.mix({
     cx: {
         value: 0
     },
@@ -75,5 +79,5 @@ CanvasPieSlice.ATTRS = Y.mix(Y.CanvasPath.ATTRS, {
     radius: {
         value: 0
     }
-});
+}, Y.CanvasShape.ATTRS);
 Y.CanvasPieSlice = CanvasPieSlice;

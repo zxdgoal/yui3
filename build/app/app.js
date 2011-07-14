@@ -35,6 +35,11 @@ var HistoryHash = Y.HistoryHash,
     win      = Y.config.win,
     location = win.location,
 
+    // We have to queue up pushState calls to avoid race conditions, since the
+    // popstate event doesn't actually provide any info on what URL it's
+    // associated with.
+    saveQueue = [],
+
     /**
     Fired when the controller is ready to begin dispatching to route handlers.
 
@@ -68,7 +73,7 @@ Y.Controller = Y.extend(Controller, Y.Base, {
     html5: html5,
 
     /**
-    Root path from which all routes should be evaluated.
+    Absolute root path from which all routes should be evaluated.
 
     For example, if your controller is running on a page at
     `http://example.com/myapp/` and you add a route with the path `/`, your
@@ -119,6 +124,15 @@ Y.Controller = Y.extend(Controller, Y.Base, {
     instantiated.
 
     @property _dispatched
+    @type Boolean
+    @default undefined
+    @protected
+    **/
+
+    /**
+    Whether or not we're currently in the process of dispatching to routes.
+
+    @property _dispatching
     @type Boolean
     @default undefined
     @protected
@@ -304,7 +318,7 @@ Y.Controller = Y.extend(Controller, Y.Base, {
     @see save()
     **/
     replace: function (url) {
-        return this._save(url, true);
+        return this._queue(url, true);
     },
 
     /**
@@ -410,7 +424,7 @@ Y.Controller = Y.extend(Controller, Y.Base, {
     @see replace()
     **/
     save: function (url) {
-        return this._save(url);
+        return this._queue(url);
     },
 
     // -- Protected Methods ----------------------------------------------------
@@ -426,6 +440,34 @@ Y.Controller = Y.extend(Controller, Y.Base, {
     **/
     _decode: function (string) {
         return decodeURIComponent(string.replace(/\+/g, ' '));
+    },
+
+    /**
+    Shifts the topmost `_save()` call off the queue and executes it. Does
+    nothing if the queue is empty.
+
+    @method _dequeue
+    @chainable
+    @see _queue
+    @protected
+    **/
+    _dequeue: function () {
+        var self = this,
+            fn;
+
+        // If window.onload hasn't yet fired, wait until it has before
+        // dequeueing. This will ensure that we don't call pushState() before an
+        // initial popstate event has fired.
+        if (!YUI.Env.windowLoaded) {
+            Y.once('load', function () {
+                self._dequeue();
+            });
+
+            return this;
+        }
+
+        fn = saveQueue.shift();
+        return fn ? fn() : this;
     },
 
     /**
@@ -445,10 +487,10 @@ Y.Controller = Y.extend(Controller, Y.Base, {
             routes = self.match(path),
             req;
 
-        self._dispatched = true;
+        self._dispatching = self._dispatched = true;
 
         if (!routes || !routes.length) {
-            return this;
+            return self;
         }
 
         req = self._getRequest(path);
@@ -476,7 +518,9 @@ Y.Controller = Y.extend(Controller, Y.Base, {
         }
 
         next();
-        return this;
+
+        self._dispatching = false;
+        return self._dequeue();
     },
 
     /**
@@ -618,6 +662,45 @@ Y.Controller = Y.extend(Controller, Y.Base, {
     },
 
     /**
+    Queues up a `_save()` call to run after all previously-queued calls have
+    finished.
+
+    This is necessary because if we make multiple `_save()` calls before the
+    first call gets dispatched, then both calls will dispatch to the last call's
+    URL.
+
+    All arguments passed to `_queue()` will be passed on to `_save()` when the
+    queued function is executed.
+
+    @method _queue
+    @chainable
+    @see _dequeue
+    @protected
+    **/
+    _queue: function () {
+        var args = arguments,
+            self = this;
+
+        saveQueue.push(function () {
+            if (html5) {
+                // Wrapped in a timeout to ensure that _save() calls are always
+                // processed asynchronously. This ensures consistency between
+                // HTML5- and hash-based history.
+                setTimeout(function () {
+                    self._save.apply(self, args);
+                }, 1);
+            } else {
+                self._dispatching = true; // otherwise we'll dequeue too quickly
+                self._save.apply(self, args);
+            }
+
+            return this;
+        });
+
+        return !this._dispatching ? this._dequeue() : this;
+    },
+
+    /**
     Removes the `root` URL from the from of _path_ (if it's there) and returns
     the result. The returned path will always have a leading `/`.
 
@@ -654,6 +737,7 @@ Y.Controller = Y.extend(Controller, Y.Base, {
         this._history[replace ? 'replace' : 'add'](null, {
             url: typeof url === 'string' ? this._joinURL(url) : url
         });
+
         return this;
     } : function (url, replace) {
         this._ready = true;
@@ -679,11 +763,7 @@ Y.Controller = Y.extend(Controller, Y.Base, {
         var self = this;
 
         if (self._ready) {
-            // We need to yield control to the UI thread to allow the browser to
-            // update window.location before we dispatch.
-            setTimeout(function () {
-                self._dispatch(self._getPath());
-            }, 1);
+            self._dispatch(self._getPath());
         }
     },
 
@@ -704,7 +784,7 @@ Y.Controller = Y.extend(Controller, Y.Base, {
 });
 
 
-}, '@VERSION@' ,{requires:['array-extras', 'base-build', 'history'], optional:['querystring-parse']});
+}, '@VERSION@' ,{optional:['querystring-parse'], requires:['array-extras', 'base-build', 'history']});
 YUI.add('model', function(Y) {
 
 /**
@@ -1295,7 +1375,7 @@ Y.Model = Y.extend(Model, Y.Base, {
     it will simply do nothing.
 
     @method undo
-    @param {Array} [attrNames] Array of specific attribute names to rever. If
+    @param {Array} [attrNames] Array of specific attribute names to revert. If
       not specified, all attributes modified in the last change will be
       reverted.
     @param {Object} [options] Data to be mixed into the event facade of the
@@ -1587,7 +1667,7 @@ Y.ModelList = Y.extend(ModelList, Y.Base, {
     This property is `null` by default, and is intended to be overridden in a
     subclass or specified as a config property at instantiation time. It will be
     used to create model instances automatically based on attribute hashes
-    passed to the `add()`, `create()`, and `remove()` methods.
+    passed to the `add()`, `create()`, and `refresh()` methods.
 
     @property model
     @type Model
@@ -1889,6 +1969,11 @@ Y.ModelList = Y.extend(ModelList, Y.Base, {
                 }, this)
             });
 
+        // Sort the models in the facade before firing the refresh event.
+        if (this.comparator) {
+            facade.models.sort(Y.bind(this._sort, this));
+        }
+
         options.silent ? this._defRefreshFn(facade) :
                 this.fire(EVT_REFRESH, facade);
 
@@ -1932,22 +2017,16 @@ Y.ModelList = Y.extend(ModelList, Y.Base, {
     @chainable
     **/
     sort: function (options) {
-        var comparator = this.comparator,
-            models     = this._items.concat(),
+        var models = this._items.concat(),
             facade;
 
-        if (!comparator) {
+        if (!this.comparator) {
             return this;
         }
 
         options || (options = {});
 
-        models.sort(function (a, b) {
-            var aValue = comparator(a),
-                bValue = comparator(b);
-
-            return aValue < bValue ? -1 : (aValue > bValue ? 1 : 0);
-        });
+        models.sort(Y.bind(this._sort, this));
 
         facade = Y.merge(options, {
             models: models,
@@ -2117,7 +2196,7 @@ Y.ModelList = Y.extend(ModelList, Y.Base, {
     _findIndex: function (model) {
         var comparator = this.comparator,
             items      = this._items,
-            max        = items.length - 1,
+            max        = items.length,
             min        = 0,
             item, middle, needle;
 
@@ -2128,10 +2207,10 @@ Y.ModelList = Y.extend(ModelList, Y.Base, {
         // Perform an iterative binary search to determine the correct position
         // based on the return value of the `comparator` function.
         while (min < max) {
-            middle = (min + max) / 2;
+            middle = (min + max) >> 1; // Divide by two and discard remainder.
             item   = items[middle];
 
-            if (item && comparator(item) < needle) {
+            if (comparator(item) < needle) {
                 min = middle + 1;
             } else {
                 max = middle;
@@ -2163,16 +2242,32 @@ Y.ModelList = Y.extend(ModelList, Y.Base, {
             Y.error('Model not in list.');
             return;
         }
-    
+
         facade = Y.merge(options, {
             index: index,
             model: model
         });
-    
+
         options.silent ? this._defRemoveFn(facade) :
                 this.fire(EVT_REMOVE, facade);
 
         return model;
+    },
+
+    /**
+    Array sort function used by `sort()` to re-sort the models in the list.
+
+    @method _sort
+    @param {Model} a First model to compare.
+    @param {Model} b Second model to compare.
+    @return {Number} `-1` if _a_ is less than _b_, `0` if equal, `1` if greater.
+    @protected
+    **/
+    _sort: function (a, b) {
+        var aValue = this.comparator(a),
+            bValue = this.comparator(b);
+
+        return aValue < bValue ? -1 : (aValue > bValue ? 1 : 0);
     },
 
     // -- Event Handlers -------------------------------------------------------
@@ -2392,7 +2487,7 @@ Y.View = Y.extend(View, Y.Base, {
     events: {},
 
     /**
-    `Y.Model` instance associated with this view instance.
+    Model instance associated with this view instance.
 
     This is entirely optional. There's no requirement that views be associated
     with models, but if you do intend to associate your view with a model, then
@@ -2401,6 +2496,20 @@ Y.View = Y.extend(View, Y.Base, {
 
     @property model
     @type Model
+    @default undefined
+    **/
+
+    /**
+    ModelList instance associated with this view instance.
+
+    This is entirely optional. There's no requirement that views be associated
+    with model lists, but if you do intend to associate your view with a model
+    list, then specifying that list instance at instantiation time will cause a
+    reference to be stored here for convenience.
+
+    @property modelList
+    @type ModelList
+    @default undefined
     **/
 
     /**
@@ -2429,6 +2538,7 @@ Y.View = Y.extend(View, Y.Base, {
         // Use config properties if present; otherwise default to prototype
         // properties.
         config.model && (this.model = config.model);
+        config.modelList && (this.modelList = config.modelList);
         config.template && (this.template = config.template);
 
         // Merge events from the config into events in `this.events`, then

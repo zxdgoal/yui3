@@ -117,8 +117,8 @@ VMLGraphic.ATTRS = {
     },
 
     /**
-     * When overflow is set to true, by default, the viewBox will resize to greater values but not values. (for performance)
-     * When resizing the viewBox down is desirable, set the resizeDown value to true.
+     * When overflow is set to true, by default, the contentBounds will resize to greater values but not values. (for performance)
+     * When resizing the contentBounds down is desirable, set the resizeDown value to true.
      *
      * @attribute resizeDown 
      * @type Boolean
@@ -306,7 +306,8 @@ Y.extend(VMLGraphic, Y.BaseGraphic, {
     getShape: function(cfg)
     {
         cfg.graphic = this;
-        var shape = new this._shapeClass[cfg.type](cfg);
+        var shapeClass = this._getShapeClass(cfg.type),
+            shape = new shapeClass(cfg);
         this.addShape(shape);
         return shape;
     },
@@ -335,7 +336,7 @@ Y.extend(VMLGraphic, Y.BaseGraphic, {
      * Removes a shape instance from from the graphic instance.
      *
      * @method removeShape
-     * @param {Shape|String}
+     * @param {Shape|String} shape The instance or id of the shape to be removed.
      */
     removeShape: function(shape)
     {
@@ -500,6 +501,19 @@ Y.extend(VMLGraphic, Y.BaseGraphic, {
     getShapeById: function(id)
     {
         return this._shapes[id];
+    },
+
+    /**
+     * @private
+     */
+    _getShapeClass: function(val)
+    {
+        var shape = this._shapeClass[val];
+        if(shape)
+        {
+            return shape;
+        }
+        return val;
     },
 
     /**

@@ -9,11 +9,17 @@ var SHAPE = "canvasShape",
 	CanvasRect,
     CanvasEllipse,
 	CanvasCircle,
-    TORGB = Y.Color.toRGB;
+    CanvasPieSlice,
+    Y_Color = Y.Color,
+    PARSE_INT = parseInt,
+    RE = RegExp,
+    TORGB = Y_Color.toRGB,
+    TOHEX = Y_Color.toHex;
 
 /**
- * Set of drawing apis for canvas based classes.
+ * Set of drawing methods for canvas based classes.
  *
+ * @module graphics
  * @class CanvasDrawing
  * @constructor
  */
@@ -23,26 +29,24 @@ function CanvasDrawing()
 
 CanvasDrawing.prototype = {
     /**
-     * Regex expression used for converting hex strings to rgb
-     *
-     * @property _reHex
-     * @private
-     */
-    _reHex: /^#?([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})$/i,
-
-    /**
      * Parses hex color string and alpha value to rgba
      *
-     * @method _2RGBA
+     * @method _toRGBA
+     * @param {Object} val Color value to parse. Can be hex string, rgb or name.
+     * @param {Number} alpha Numeric value between 0 and 1 representing the alpha level.
      * @private
      */
-    _2RGBA: function(val, alpha) {
+    _toRGBA: function(val, alpha) {
         alpha = (alpha !== undefined) ? alpha : 1;
-        if (this._reHex.exec(val)) {
+        if (!Y_Color.re_RGB.test(val)) {
+            val = TOHEX(val);
+        }
+
+        if(Y_Color.re_hex.exec(val)) {
             val = 'rgba(' + [
-                parseInt(RegExp.$1, 16),
-                parseInt(RegExp.$2, 16),
-                parseInt(RegExp.$3, 16)
+                PARSE_INT(RE.$1, 16),
+                PARSE_INT(RE.$2, 16),
+                PARSE_INT(RE.$3, 16)
             ].join(',') + ',' + alpha + ')';
         }
         return val;
@@ -51,10 +55,11 @@ CanvasDrawing.prototype = {
     /**
      * Converts color to rgb format
      *
-     * @method _2RGB
+     * @method _toRGB
+     * @param val Color value to convert.
      * @private 
      */
-    _2RGB: function(val) {
+    _toRGB: function(val) {
         return TORGB(val);
     },
 
@@ -82,6 +87,11 @@ CanvasDrawing.prototype = {
     },
     
 	/**
+     * Tracks coordinates. Used to calculate the start point of dashed lines. 
+     *
+     * @method _updateCoords
+     * @param {Number} x x-coordinate
+     * @param {Number} y y-coordinate
 	 * @private
 	 */
     _updateCoords: function(x, y)
@@ -91,7 +101,10 @@ CanvasDrawing.prototype = {
     },
 
 	/**
-	 * @private
+     * Clears the coordinate arrays. Called at the end of a drawing operation.  
+	 * 
+     * @method _clearAndUpdateCoords
+     * @private
 	 */
     _clearAndUpdateCoords: function()
     {
@@ -101,6 +114,9 @@ CanvasDrawing.prototype = {
     },
 
 	/**
+     * Moves the shape's dom node.
+     *
+     * @method _updateNodePosition
 	 * @private
 	 */
     _updateNodePosition: function()
@@ -123,7 +139,13 @@ CanvasDrawing.prototype = {
     _properties: null,
     
     /**
-     * Adds a method to the drawing queue
+     * Queues up a method to be executed when a shape redraws.
+     *
+     * @method _updateDrawingQueue
+     * @param {Array} val An array containing data that can be parsed into a method and arguments. The value at zero-index of the array is a string reference of
+     * the drawing method that will be called. All subsequent indices are argument for that method. For example, `lineTo(10, 100)` would be structured as:
+     * `["lineTo", 10, 100]`.
+     * @private
      */
     _updateDrawingQueue: function(val)
     {
@@ -450,6 +472,7 @@ CanvasDrawing.prototype = {
      * Returns a linear gradient fill
      *
      * @method _getLinearGradient
+     * @return CanvasGradient
      * @private
      */
     _getLinearGradient: function() {
@@ -513,11 +536,11 @@ CanvasDrawing.prototype = {
             if(isNumber(opacity))
             {
                 opacity = Math.max(0, Math.min(1, opacity));
-                color = this._2RGBA(color, opacity);
+                color = this._toRGBA(color, opacity);
             }
             else
             {
-                color = this._2RGB(color);
+                color = TORGB(color);
             }
             offset = stop.offset || i/(len - 1);
             gradient.addColorStop(offset, color);
@@ -529,6 +552,7 @@ CanvasDrawing.prototype = {
      * Returns a radial gradient fill
      *
      * @method _getRadialGradient
+     * @return CanvasGradient
      * @private
      */
     _getRadialGradient: function() {
@@ -599,11 +623,11 @@ CanvasDrawing.prototype = {
             if(isNumber(opacity))
             {
                 opacity = Math.max(0, Math.min(1, opacity));
-                color = this._2RGBA(color, opacity);
+                color = this._toRGBA(color, opacity);
             }
             else
             {
-                color = this._2RGB(color);
+                color = TORGB(color);
             }
             offset = stop.offset || i/(len - 1);
             offset *= stopMultiplier;
@@ -636,6 +660,10 @@ CanvasDrawing.prototype = {
     },
    
     /**
+     * Indicates a drawing has completed.
+     *
+     * @property _drawingComplete
+     * @type Boolean
      * @private
      */
     _drawingComplete: false,
@@ -644,6 +672,7 @@ CanvasDrawing.prototype = {
      * Creates canvas element
      *
      * @method _createGraphic
+     * @return HTMLCanvasElement
      * @private
      */
     _createGraphic: function(config) {
@@ -683,7 +712,9 @@ Y.CanvasDrawing = CanvasDrawing;
 /**
  * Base class for creating shapes.
  *
+ * @module graphics
  * @class CanvasShape
+ * @constructor
  */
 CanvasShape = function(cfg)
 {
@@ -692,9 +723,13 @@ CanvasShape = function(cfg)
 
 CanvasShape.NAME = "canvasShape";
 
-Y.extend(CanvasShape, Y.BaseGraphic, Y.mix(Y.CanvasDrawing.prototype, {
-	/**
-     * @private
+Y.extend(CanvasShape, Y.BaseGraphic, Y.mix({
+    /**
+     * Init method, invoked during construction.
+     * Calls `initializer` method.
+     *
+     * @method init
+     * @protected
      */
     init: function()
 	{
@@ -814,9 +849,9 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix(Y.CanvasDrawing.prototype, {
 	/**
 	 * Value function for fill attribute
 	 *
-	 * @private
 	 * @method _getDefaultFill
 	 * @return Object
+	 * @private
 	 */
 	_getDefaultFill: function() {
 		return {
@@ -832,9 +867,9 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix(Y.CanvasDrawing.prototype, {
 	/**
 	 * Value function for stroke attribute
 	 *
-	 * @private
 	 * @method _getDefaultStroke
 	 * @return Object
+	 * @private
 	 */
 	_getDefaultStroke: function() 
 	{
@@ -849,6 +884,8 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix(Y.CanvasDrawing.prototype, {
 	/**
 	 * Left edge of the path
 	 *
+     * @property _left
+     * @type Number
 	 * @private
 	 */
 	_left: 0,
@@ -856,6 +893,8 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix(Y.CanvasDrawing.prototype, {
 	/**
 	 * Right edge of the path
 	 *
+     * @property _right
+     * @type Number
 	 * @private
 	 */
 	_right: 0,
@@ -863,6 +902,8 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix(Y.CanvasDrawing.prototype, {
 	/**
 	 * Top edge of the path
 	 *
+     * @property _top
+     * @type Number
 	 * @private
 	 */
 	_top: 0, 
@@ -870,6 +911,8 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix(Y.CanvasDrawing.prototype, {
 	/**
 	 * Bottom edge of the path
 	 *
+     * @property _bottom
+     * @type Number
 	 * @private
 	 */
 	_bottom: 0,
@@ -877,8 +920,9 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix(Y.CanvasDrawing.prototype, {
 	/**
 	 * Creates the dom node for the shape.
 	 *
-	 * @private
+     * @method createNode
 	 * @return HTMLElement
+	 * @private
 	 */
 	createNode: function()
 	{
@@ -895,6 +939,11 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix(Y.CanvasDrawing.prototype, {
 	},
 
 	/**
+     * Parses event to determine if it is a dom interaction event.
+     *
+     * @method isMouseEvent
+     * @param {String} type Type of event
+     * @return Boolean
 	 * @private
 	 */
 	isMouseEvent: function(type)
@@ -907,6 +956,12 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix(Y.CanvasDrawing.prototype, {
 	},
 	
 	/**
+     * Overrides default `before` method. Checks to see if its a dom interaction event. If so, 
+     * return an event attached to the `node` element. If not, return the normal functionality.
+     *
+     * @method before
+     * @param {String} type event type
+     * @param {Object} callback function
 	 * @private
 	 */
 	before: function(type, fn)
@@ -919,6 +974,12 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix(Y.CanvasDrawing.prototype, {
 	},
 	
 	/**
+     * Overrides default `on` method. Checks to see if its a dom interaction event. If so, 
+     * return an event attached to the `node` element. If not, return the normal functionality.
+     *
+     * @method on
+     * @param {String} type event type
+     * @param {Object} callback function
 	 * @private
 	 */
 	on: function(type, fn)
@@ -931,6 +992,12 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix(Y.CanvasDrawing.prototype, {
 	},
 	
 	/**
+     * Overrides default `after` method. Checks to see if its a dom interaction event. If so, 
+     * return an event attached to the `node` element. If not, return the normal functionality.
+     *
+     * @method after
+     * @param {String} type event type
+     * @param {Object} callback function
 	 * @private
 	 */
 	after: function(type, fn)
@@ -946,6 +1013,7 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix(Y.CanvasDrawing.prototype, {
 	 * Adds a stroke to the shape node.
 	 *
 	 * @method _strokeChangeHandler
+     * @param {Object} stroke Properties of the `stroke` attribute.
 	 * @private
 	 */
 	_setStrokeProps: function(stroke)
@@ -969,7 +1037,7 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix(Y.CanvasDrawing.prototype, {
 			this._stroke = 0;
 		}
 		if (opacity) {
-			this._strokeStyle = this._2RGBA(color, opacity);
+			this._strokeStyle = this._toRGBA(color, opacity);
 		}
 		else
 		{
@@ -991,15 +1059,21 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix(Y.CanvasDrawing.prototype, {
 		}
 	},
 
-	/**
-	 * @private
-	 */
+    /**
+     * Sets the value of an attribute.
+     *
+     * @method set
+     * @param {String|Object} name The name of the attribute. Alternatively, an object of key value pairs can 
+     * be passed in to set multiple attributes at once.
+     * @param {Any} value The value to set the attribute to. This value is ignored if an object is received as 
+     * the name param.
+     */
 	set: function() 
 	{
 		var host = this,
 			val = arguments[0];
 		AttributeLite.prototype.set.apply(host, arguments);
-		if(host.initialized && val != "x" && val != "y")
+		if(host.initialized)
 		{
 			host._updateHandler();
 		}
@@ -1008,7 +1082,8 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix(Y.CanvasDrawing.prototype, {
 	/**
 	 * Adds a fill to the shape node.
 	 *
-	 * @method _fillChangeHandler
+	 * @method _setFillProps 
+     * @param {Object} fill Properties of the `fill` attribute.
 	 * @private
 	 */
 	_setFillProps: function(fill)
@@ -1027,11 +1102,11 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix(Y.CanvasDrawing.prototype, {
 			if (isNumber(opacity)) 
 			{
 				opacity = Math.max(0, Math.min(1, opacity));
-				color = this._2RGBA(color, opacity);
+				color = this._toRGBA(color, opacity);
 			} 
 			else 
 			{
-				color = this._2RGB(color);
+				color = TORGB(color);
 			}
 
 			this._fillColor = color;
@@ -1049,18 +1124,31 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix(Y.CanvasDrawing.prototype, {
 	 * @method translate
 	 * @param {Number} x The x-coordinate
 	 * @param {Number} y The y-coordinate
-	 * @protected
 	 */
 	translate: function(x, y)
 	{
-		var translate = "translate(" + x + "px, " + y + "px)";
-		this._updateTransform("translate", /translate\(.*\)/, translate);
+		this._translateX = x;
+		this._translateY = y;
+		this._translate.apply(this, arguments);
+	},
+
+	/**
+	 * Applies translate transformation.
+	 *
+	 * @method translate
+	 * @param {Number} x The x-coordinate
+	 * @param {Number} y The y-coordinate
+	 * @protected
+	 */
+	_translate: function(x, y)
+	{
+		this._addTransform("translate", [x + "px", y + "px"]);
 	},
 
 	/**
 	 * Applies a skew to the x-coordinate
 	 *
-	 * @method skewX:q
+	 * @method skewX
 	 * @param {Number} x x-coordinate
 	 */
 	 skewX: function(x)
@@ -1068,16 +1156,20 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix(Y.CanvasDrawing.prototype, {
 	 },
 
 	/**
-	 * Applies a skew to the x-coordinate
+	 * Applies a skew to the y-coordinate
 	 *
-	 * @method skewX:q
-	 * @param {Number} x x-coordinate
+	 * @method skewY
+	 * @param {Number} y y-coordinate
 	 */
 	 skewY: function(y)
 	 {
 	 },
 
 	/**
+     * Storage for `rotation` atribute.
+     *
+     * @property _rotation
+     * @type Number
 	 * @private
 	 */
 	_rotation: 0,
@@ -1086,26 +1178,13 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix(Y.CanvasDrawing.prototype, {
 	 * Applies a rotation.
 	 *
 	 * @method rotate
-	 * @param
+	 * @param {Number} deg The degree of the rotation.
 	 */
 	rotate: function(deg)
 	{
 		var rotate = "rotate(" + deg + "deg)";
 		this._rotation = deg;
-		this._updateTransform("rotate", /rotate\(.*\)/, rotate);
-	},
-
-	/**
-	 * An array of x, y values which indicates the transformOrigin in which to rotate the shape. Valid values range between 0 and 1 representing a 
-	 * fraction of the shape's corresponding bounding box dimension. The default value is [0.5, 0.5].
-	 *
-	 * @attribute transformOrigin
-	 * @type Array
-	 */
-	_transformOrigin: function(x, y)
-	{
-		var node = this.get("node");
-		node.style.MozTransformOrigin = (100 * x) + "% " + (100 * y) + "%";
+		this._addTransform("rotate", [deg + "deg"]);
 	},
 
 	/**
@@ -1122,62 +1201,116 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix(Y.CanvasDrawing.prototype, {
 	 * Applies a matrix transformation
 	 *
 	 * @method matrix
+     * @param {Number} a
+     * @param {Number} b
+     * @param {Number} c
+     * @param {Number} d
+     * @param {Number} e
+     * @param {Number} f
 	 */
 	matrix: function(a, b, c, d, e, f)
 	{
 	},
-
-	/**
+	
+    /**
+     * Adds a transform to the shape.
+     *
+     * @method _addTransform
+     * @param {String} type The transform being applied.
+     * @param {Array} args The arguments for the transform.
 	 * @private
 	 */
-	_updateTransform: function(type, test, val)
+	_addTransform: function(type, args)
 	{
-		var node = this.get("node"),
+		if(!this._transformArgs)
+		{
+			this._transformArgs = {};
+		}
+		this._transformArgs[type] = Array.prototype.slice.call(args, 0);
+		if(this.initialized)
+        {
+            this._updateTransform();
+        }
+	},
+
+	/**
+     * Applies all transforms.
+     *
+     * @method _updateTransform
+	 * @private
+	 */
+	_updateTransform: function()
+	{
+		var node = this.node,
+			key,
+			args,
+			val,
 			transform = node.style.MozTransform || node.style.webkitTransform || node.style.msTransform || node.style.OTransform,
+			test,
 			transformOrigin = this.get("transformOrigin");
-		if(transform && transform.length > 0)
+		for(key in this._transformArgs)
 		{
-			if(transform.indexOf(type) > -1)
+            if(key && this._transformArgs.hasOwnProperty(key))
 			{
-				transform = transform.replace(test, val);
-			}
-			else
-			{
-				transform += " " + val;
+				val = key + "(" + this._transformArgs[key].toString() + ")";
+				if(transform && transform.length > 0)
+				{
+					test = new RegExp(key + '(.*)');
+					if(transform.indexOf(key) > -1)
+					{
+						transform = transform.replace(test, val);
+					}
+					else
+					{
+						transform += " " + val;
+					}
+				}
+				else
+				{
+					transform = val;
+				}
 			}
 		}
-		else
-		{
-			transform = val;
-		}
+        this._graphic.addToRedrawQueue(this);    
 		transformOrigin = (100 * transformOrigin[0]) + "% " + (100 * transformOrigin[1]) + "%";
 		node.style.MozTransformOrigin = transformOrigin; 
 		node.style.webkitTransformOrigin = transformOrigin;
 		node.style.msTransformOrigin = transformOrigin;
 		node.style.OTransformOrigin = transformOrigin;
-		node.style.MozTransform = transform;
-		node.style.webkitTransform = transform;
-		node.style.msTransform = transform;
-		node.style.OTransform = transform;
-		this._graphic.addToRedrawQueue(this);    
+        if(transform)
+		{
+            node.style.MozTransform = transform;
+            node.style.webkitTransform = transform;
+            node.style.msTransform = transform;
+            node.style.OTransform = transform;
+		}
 	},
 
 	/**
+     * Updates `Shape` based on attribute changes.
+     *
+     * @method _updateHandler
 	 * @private
 	 */
 	_updateHandler: function()
 	{
 		this._draw();
-		this._graphic.addToRedrawQueue(this);    
+		this._updateTransform();
 	},
 	
 	/**
+	 * Updates the shape.
+	 *
+	 * @method _draw
 	 * @private
 	 */
 	_draw: function()
 	{
+        var node = this.node;
         this.clear();
 		this._paint();
+		node.style.left = this.get("x") + "px";
+		node.style.top = this.get("y") + "px";
 	},
 
 	/**
@@ -1458,6 +1591,11 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix(Y.CanvasDrawing.prototype, {
         return (toy - (x - tox) * sinRadians + (y - toy) * cosRadians);
     },
 
+    /**
+     * Destroys the instance.
+     *
+     * @method destroy
+     */
     destroy: function()
     {
         var node = this.node,
@@ -1474,7 +1612,7 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix(Y.CanvasDrawing.prototype, {
             }
         }
 	}
-}));
+}, Y.CanvasDrawing.prototype));
 
 CanvasShape.ATTRS =  {
 	/**
@@ -1510,7 +1648,49 @@ CanvasShape.ATTRS =  {
 	},
 
 	/**
-	 * Dom node of the shape
+	 * Performs a translate on the x-coordinate. When translating x and y coordinates,
+	 * use the `translate` method.
+	 *
+	 * @attribute translateX
+	 * @type Number
+	 */
+	translateX: {
+		getter: function()
+		{
+			return this._translateX;
+		},
+
+		setter: function(val)
+		{
+			this._translateX = val;
+			this._translate(val, this._translateY);
+			return val;
+		}
+	},
+	
+	/**
+	 * Performs a translate on the y-coordinate. When translating x and y coordinates,
+	 * use the `translate` method.
+	 *
+	 * @attribute translateX
+	 * @type Number
+	 */
+	translateY: {
+		getter: function()
+		{
+			return this._translateY;
+		},
+
+		setter: function(val)
+		{
+			this._translateY = val;
+			this._translate(this._translateX, val);
+			return val;
+		}
+	},
+
+	/**
+	 * Dom node for the shape
 	 *
 	 * @attribute node
 	 * @type HTMLElement
@@ -1739,9 +1919,12 @@ Y.extend(CanvasPath, Y.CanvasShape, {
      */
     _type: "path",
 
-    /**
-     * @private
-     */
+	/**
+	 * Draws the shape.
+	 *
+	 * @method _draw
+	 * @private
+	 */
     _draw: function()
     {
         this._paint();
@@ -1839,6 +2022,10 @@ CanvasPath.ATTRS = Y.merge(Y.CanvasShape.ATTRS, {
 Y.CanvasPath = CanvasPath;
 /**
  * Draws rectangles
+ *
+ * @module graphics
+ * @class CanvasRect
+ * @constructor
  */
 CanvasRect = function()
 {
@@ -1856,6 +2043,9 @@ Y.extend(CanvasRect, Y.CanvasShape, {
 	_type: "rect",
 
 	/**
+	 * Draws the shape.
+	 *
+	 * @method _draw
 	 * @private
 	 */
 	_draw: function()
@@ -1870,7 +2060,11 @@ Y.extend(CanvasRect, Y.CanvasShape, {
 CanvasRect.ATTRS = Y.CanvasShape.ATTRS;
 Y.CanvasRect = CanvasRect;
 /**
- * Draws ellipses
+ * Draws an ellipse
+ *
+ * @module graphics
+ * @class CanvasEllipse
+ * @constructor
  */
 CanvasEllipse = function(cfg)
 {
@@ -1890,6 +2084,9 @@ Y.extend(CanvasEllipse, CanvasShape, {
 	_type: "ellipse",
 
 	/**
+     * Draws the shape.
+     *
+     * @method _draw
 	 * @private
 	 */
 	_draw: function()
@@ -1905,6 +2102,10 @@ CanvasEllipse.ATTRS = CanvasShape.ATTRS;
 Y.CanvasEllipse = CanvasEllipse;
 /**
  * Draws an circle
+ *
+ * @module graphics
+ * @class CanvasCircle
+ * @constructor
  */
 CanvasCircle = function(cfg)
 {
@@ -1924,6 +2125,9 @@ Y.extend(CanvasCircle, Y.CanvasShape, {
 	_type: "circle",
 
 	/**
+     * Draws the shape.
+     *
+     * @method _draw
 	 * @private
 	 */
 	_draw: function()
@@ -1981,6 +2185,7 @@ CanvasCircle.ATTRS = Y.merge(Y.CanvasShape.ATTRS, {
 	 * Radius of the circle
 	 *
 	 * @attribute radius
+     * @type Number
 	 */
 	radius: {
 		lazyAdd: false
@@ -1989,13 +2194,17 @@ CanvasCircle.ATTRS = Y.merge(Y.CanvasShape.ATTRS, {
 Y.CanvasCircle = CanvasCircle;
 /**
  * Draws pie slices
+ *
+ * @module graphics
+ * @class CanvasPieSlice
+ * @constructor
  */
 CanvasPieSlice = function()
 {
 	CanvasPieSlice.superclass.constructor.apply(this, arguments);
 };
 CanvasPieSlice.NAME = "canvasPieSlice";
-Y.extend(CanvasPieSlice, Y.CanvasPath, {
+Y.extend(CanvasPieSlice, Y.CanvasShape, {
     /**
      * Indicates the type of shape
      *
@@ -2011,7 +2220,7 @@ Y.extend(CanvasPieSlice, Y.CanvasPath, {
 	 * @private
 	 * @method _updateHandler
 	 */
-	_updateHandler: function(e)
+	_draw: function(e)
 	{
         var x = this.get("cx"),
             y = this.get("cy"),
@@ -2023,11 +2232,11 @@ Y.extend(CanvasPieSlice, Y.CanvasPath, {
         this._right = radius;
         this._top = y;
         this._bottom = radius;
-        this.drawWedge(x, y, startAngle, arc, radius)
-		this._draw();
+        this.drawWedge(x, y, startAngle, arc, radius);
+		this.end();
 	}
  });
-CanvasPieSlice.ATTRS = Y.mix(Y.CanvasPath.ATTRS, {
+CanvasPieSlice.ATTRS = Y.mix({
     cx: {
         value: 0
     },
@@ -2064,11 +2273,12 @@ CanvasPieSlice.ATTRS = Y.mix(Y.CanvasPath.ATTRS, {
     radius: {
         value: 0
     }
-});
+}, Y.CanvasShape.ATTRS);
 Y.CanvasPieSlice = CanvasPieSlice;
 /**
  * CanvasGraphic is a simple drawing api that allows for basic drawing operations.
  *
+ * @module graphics
  * @class CanvasGraphic
  * @constructor
  */
@@ -2080,6 +2290,12 @@ function CanvasGraphic(config) {
 CanvasGraphic.NAME = "canvasGraphic";
 
 CanvasGraphic.ATTRS = {
+    /**
+     * Whether or not to render the `Graphic` automatically after to a specified parent node after init. This can be a Node instance or a CSS selector string.
+     * 
+     * @attribute render
+     * @type Node | String 
+     */
     render: {},
 	
     /**
@@ -2153,6 +2369,12 @@ CanvasGraphic.ATTRS = {
         }
     },
 
+	/**
+	 * Indicates the width of the `Graphic`. 
+	 *
+	 * @attribute width
+	 * @type Number
+	 */
     width: {
         setter: function(val)
         {
@@ -2164,6 +2386,12 @@ CanvasGraphic.ATTRS = {
         }
     },
 
+	/**
+	 * Indicates the height of the `Graphic`. 
+	 *
+	 * @attribute height 
+	 * @type Number
+	 */
     height: {
         setter: function(val)
         {
@@ -2188,8 +2416,8 @@ CanvasGraphic.ATTRS = {
     },
 
     /**
-     * When overflow is set to true, by default, the viewBox will resize to greater values but not values. (for performance)
-     * When resizing the viewBox down is desirable, set the resizeDown value to true.
+     * When overflow is set to true, by default, the contentBounds will resize to greater values but not smaller values. (for performance)
+     * When resizing the contentBounds down is desirable, set the resizeDown value to true.
      *
      * @attribute resizeDown 
      * @type Boolean
@@ -2267,6 +2495,12 @@ CanvasGraphic.ATTRS = {
         value: true
     },
 
+	/**
+	 * Indicates whether the `Graphic` and its children are visible.
+	 *
+	 * @attribute visible
+	 * @type Boolean
+	 */
     visible: {
         value: true,
 
@@ -2280,11 +2514,19 @@ CanvasGraphic.ATTRS = {
 
 Y.extend(CanvasGraphic, Y.BaseGraphic, {
     /**
+     * Storage for `x` attribute.
+     *
+     * @property _x
+     * @type Number
      * @private
      */
     _x: 0,
 
     /**
+     * Storage for `y` attribute.
+     *
+     * @property _y
+     * @type Number
      * @private
      */
     _y: 0,
@@ -2307,9 +2549,11 @@ Y.extend(CanvasGraphic, Y.BaseGraphic, {
     },
 
     /**
-     * @private
+     * Storage for `resizeDown` attribute.
+     *
      * @property _resizeDown 
      * @type Boolean
+     * @private
      */
     _resizeDown: false,
     
@@ -2317,6 +2561,7 @@ Y.extend(CanvasGraphic, Y.BaseGraphic, {
      * Initializes the class.
      *
      * @method initializer
+     * @param {Object} config Optional attributes 
      * @private
      */
     initializer: function(config) {
@@ -2390,7 +2635,8 @@ Y.extend(CanvasGraphic, Y.BaseGraphic, {
     getShape: function(cfg)
     {
         cfg.graphic = this;
-        var shape = new this._shapeClass[cfg.type](cfg);
+        var shapeClass = this._getShapeClass(cfg.type),
+            shape = new shapeClass(cfg);
         this.addShape(shape);
         return shape;
     },
@@ -2400,6 +2646,7 @@ Y.extend(CanvasGraphic, Y.BaseGraphic, {
      *
      * @method addShape
      * @param {Shape} shape The shape instance to be added to the graphic.
+     * @private
      */
     addShape: function(shape)
     {
@@ -2419,7 +2666,7 @@ Y.extend(CanvasGraphic, Y.BaseGraphic, {
      * Removes a shape instance from from the graphic instance.
      *
      * @method removeShape
-     * @param {Shape|String}
+     * @param {Shape|String} shape The instance or id of the shape to be removed.
      */
     removeShape: function(shape)
     {
@@ -2506,8 +2753,29 @@ Y.extend(CanvasGraphic, Y.BaseGraphic, {
         }
         this._node.style.visibility = visibility;
     },
+
+    /**
+     * Returns a shape class. Used by `getShape`. 
+     *
+     * @param {Shape | String} val Indicates which shape class. 
+     * @return Function 
+     * @private
+     */
+    _getShapeClass: function(val)
+    {
+        var shape = this._shapeClass[val];
+        if(shape)
+        {
+            return shape;
+        }
+        return val;
+    },
     
     /**
+     * Look up for shape classes. Used by `getShape` to retrieve a class for instantiation.
+     *
+     * @property _shapeClass
+     * @type Object
      * @private
      */
     _shapeClass: {
@@ -2546,6 +2814,13 @@ Y.extend(CanvasGraphic, Y.BaseGraphic, {
         this.set("autoDraw", autoDraw);
     },
 
+    /**
+     * Returns a document fragment to for attaching shapes.
+     *
+     * @method _getDocFrag
+     * @return DocumentFragment
+     * @private
+     */
     _getDocFrag: function()
     {
         if(!this._frag)
@@ -2555,6 +2830,12 @@ Y.extend(CanvasGraphic, Y.BaseGraphic, {
         return this._frag;
     },
     
+    /**
+     * Redraws all shapes.
+     *
+     * @method _redraw
+     * @private
+     */
     _redraw: function()
     {
         var box = this.get("resizeDown") ? this._getUpdatedContentBounds() : this._contentBounds;
@@ -2574,7 +2855,7 @@ Y.extend(CanvasGraphic, Y.BaseGraphic, {
      * Adds a shape to the redraw queue. 
      *
      * @method addToRedrawQueue
-     * @param shape {CanvasShape}
+     * @param Shape shape The shape instance to add to the queue
      */
     addToRedrawQueue: function(shape)
     {
@@ -2599,6 +2880,13 @@ Y.extend(CanvasGraphic, Y.BaseGraphic, {
         }
     },
 
+    /**
+     * Recalculates and returns the `contentBounds` for the `Graphic` instance.
+     *
+     * @method _getUpdateContentBounds
+     * @return {Object} 
+     * @private
+     */
     _getUpdatedContentBounds: function()
     {
         var bounds,
