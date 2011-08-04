@@ -13,7 +13,7 @@ if (!YUI.Env[Y.version]) {
             BUILD = '/build/',
             ROOT = VERSION + BUILD,
             CDN_BASE = Y.Env.base,
-            GALLERY_VERSION = 'gallery-2011.07.20-20-59',
+            GALLERY_VERSION = 'gallery-2011.08.03-21-18',
             TNT = '2in3',
             TNT_VERSION = '4',
             YUI2_VERSION = '2.9.0',
@@ -1021,7 +1021,7 @@ Y.Loader.prototype = {
         o.requires = this.filterRequires(o.requires) || [];
 
         // Handle submodule logic
-        var subs = o.submodules, i, l, sup, s, smod, plugins, plug,
+        var subs = o.submodules, i, l, t, sup, s, smod, plugins, plug,
             j, langs, packName, supName, flatSup, flatLang, lang, ret,
             overrides, skinname, when,
             conditions = this.conditions, trigger;
@@ -1155,24 +1155,34 @@ Y.Loader.prototype = {
         }
 
         if (o.condition) {
-            trigger = o.condition.trigger;
-            when = o.condition.when;
-            conditions[trigger] = conditions[trigger] || {};
-            conditions[trigger][name] = o.condition;
-            // the 'when' attribute can be 'before', 'after', or 'instead'
-            // the default is after.
-            if (when && when != 'after') {
-                if (when == 'instead') { // replace the trigger
-                    o.supersedes = o.supersedes || [];
-                    o.supersedes.push(trigger);
-                } else { // before the trigger
-                    // the trigger requires the conditional mod,
-                    // so it should appear before the conditional
-                    // mod if we do not intersede.
+            t = o.condition.trigger;
+            if (YUI.Env.aliases[t]) {
+                t = YUI.Env.aliases[t];
+            }
+            if (!Y.Lang.isArray(t)) {
+                t = [t];
+            }
+
+            for (i = 0; i < t.length; i++) {
+                trigger = t[i];
+                when = o.condition.when;
+                conditions[trigger] = conditions[trigger] || {};
+                conditions[trigger][name] = o.condition;
+                // the 'when' attribute can be 'before', 'after', or 'instead'
+                // the default is after.
+                if (when && when != 'after') {
+                    if (when == 'instead') { // replace the trigger
+                        o.supersedes = o.supersedes || [];
+                        o.supersedes.push(trigger);
+                    } else { // before the trigger
+                        // the trigger requires the conditional mod,
+                        // so it should appear before the conditional
+                        // mod if we do not intersede.
+                    }
+                } else { // after the trigger
+                    o.after = o.after || [];
+                    o.after.push(trigger);
                 }
-            } else { // after the trigger
-                o.after = o.after || [];
-                o.after.push(trigger);
             }
         }
 
@@ -1251,12 +1261,19 @@ Y.Loader.prototype = {
                 r = [r];
             }
             r = Y.Array(r);
-            var c = [];
-            for (var i = 0; i < r.length; i++) {
-                var mod = this.getModule(r[i]);
+            var c = [], i, mod, o, m;
+
+            for (i = 0; i < r.length; i++) {
+                mod = this.getModule(r[i]);
                 if (mod && mod.use) {
-                    for (var o = 0; o < mod.use.length; o++) {
-                        c.push(mod.use[o]);
+                    for (o = 0; o < mod.use.length; o++) {
+                        //Must walk the other modules in case a module is a rollup of rollups (datatype)
+                        m = this.getModule(mod.use[o]);
+                        if (m && m.use) {
+                            c = Y.Array.dedupe([].concat(c, this.filterRequires(m.use)));
+                        } else {
+                            c.push(mod.use[o]);
+                        }
                     }
                 } else {
                     c.push(r[i]);
@@ -1284,7 +1301,7 @@ Y.Loader.prototype = {
             adddef = ON_PAGE[name] && ON_PAGE[name].details,
             d, k, m1,
             r, old_mod,
-            o, skinmod, skindef,
+            o, skinmod, skindef, skinpar, skinname,
             intl = mod.lang || mod.intl,
             info = this.moduleInfo,
             ftests = Y.Features && Y.Features.tests.load,
@@ -1402,7 +1419,6 @@ Y.Loader.prototype = {
                 });
             } else {
                 oeach(cond, function(def, condmod) {
-
                     if (!hash[condmod]) {
                         go = def && ((def.ua && Y.UA[def.ua]) ||
                                      (def.test && def.test(Y, r)));
@@ -1425,9 +1441,18 @@ Y.Loader.prototype = {
         // Create skin modules
         if (mod.skinnable) {
             skindef = this.skin.overrides;
-            if (skindef && skindef[name]) {
-                for (i = 0; i < skindef[name].length; i++) {
-                    skinmod = this._addSkin(skindef[name][i], name);
+            oeach(YUI.Env.aliases, function(o, n) {
+                if (Y.Array.indexOf(o, name) > -1) {
+                    skinpar = n;
+                }
+            });
+            if (skindef && (skindef[name] || (skinpar && skindef[skinpar]))) {
+                skinname = name;
+                if (skindef[skinpar]) {
+                    skinname = skinpar;
+                }
+                for (i = 0; i < skindef[skinname].length; i++) {
+                    skinmod = this._addSkin(skindef[skinname][i], name);
                     d.push(skinmod);
                 }
             } else {
@@ -2289,7 +2314,7 @@ Y.Loader.prototype = {
 
     /**
      * Apply filter defined for this instance to a url/path
-     * method _filter
+     * @method _filter
      * @param {string} u the string to filter.
      * @param {string} name the name of the module, if we are processing
      * a single module as opposed to a combined url.
@@ -2317,7 +2342,7 @@ Y.Loader.prototype = {
 
     /**
      * Generates the full url for a module
-     * method _url
+     * @method _url
      * @param {string} path the path fragment.
      * @param {String} name The name of the module
      * @pamra {String} [base=self.base] The base url to use
@@ -2368,6 +2393,44 @@ Y.Loader.prototype = {
         if (self.combine) {
             out.js = [self.comboBase + out.js.join(self.comboSep)];
             out.css = [self.comboBase + out.css.join(self.comboSep)];
+        }
+
+        return out;
+    },
+    /**
+    * Returns an Object hash of hashes built from `loader.sorted` or from an arbitrary list of sorted modules.
+    * @method hash
+    * @private
+    * @param {Boolean} [calc=false] Perform a loader.calculate() before anything else
+    * @param {Array} [s=loader.sorted] An override for the loader.sorted array
+    * @return {Object} Object hash (js and css) of two object hashes of file lists, with the module name as the key
+    * @example This method can be used as an off-line dep calculator
+    *
+    *        var Y = YUI();
+    *        var loader = new Y.Loader({
+    *            filter: 'debug',
+    *            base: '../../',
+    *            root: 'build/',
+    *            combine: true,
+    *            require: ['node', 'dd', 'console']
+    *        });
+    *        var out = loader.hash(true);
+    *
+    */
+    hash: function(calc, s) {
+        var self = this, i, m, url, out = { js: {}, css: {} };
+
+        if (calc) {
+            self.calculate();
+        }
+        s = s || self.sorted;
+
+        for (i = 0; i < s.length; i++) {
+            m = self.getModule(s[i]);
+            if (m) {
+                url = self._filter(m.fullpath, m.name, '') || self._url(m.path, m.name);
+                out[m.type][m.name] = url;
+            }
         }
 
         return out;
@@ -2480,7 +2543,7 @@ Y.Loader.prototype._rollup = function() {
 }, '@VERSION@' ,{requires:['loader-base']});
 YUI.add('loader-yui3', function(Y) {
 
-/* This file is auto-generated by src/loader/meta_join.py */
+/* This file is auto-generated by src/loader/scripts/meta_join.py */
 
 /**
  * YUI 3 module metadata
@@ -2751,7 +2814,8 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
             "ru"
         ], 
         "requires": [
-            "calendar-base"
+            "calendar-base", 
+            "calendarnavigator"
         ], 
         "skinnable": true
     }, 
@@ -2764,7 +2828,15 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
             "widget", 
             "substitute", 
             "datatype-date", 
-            "datatype-date-math"
+            "datatype-date-math", 
+            "cssgrids"
+        ], 
+        "skinnable": true
+    }, 
+    "calendarnavigator": {
+        "requires": [
+            "plugin", 
+            "classnamemanager"
         ], 
         "skinnable": true
     }, 
@@ -2798,14 +2870,6 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
             "arraylist-add", 
             "arraylist-filter", 
             "array-invoke"
-        ]
-    }, 
-    "compat": {
-        "requires": [
-            "event-base", 
-            "dom", 
-            "dump", 
-            "substitute"
         ]
     }, 
     "console": {
@@ -4136,7 +4200,8 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
     "scrollview-list": {
         "requires": [
             "plugin"
-        ]
+        ], 
+        "skinnable": true
     }, 
     "scrollview-paginator": {
         "requires": [
@@ -4463,19 +4528,7 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
             "jsonp-url"
         ]
     }, 
-    "yui": {
-        "use": [
-            "yui-base", 
-            "get", 
-            "features", 
-            "intl-base", 
-            "yui-log", 
-            "yui-later", 
-            "loader-base", 
-            "loader-rollup", 
-            "loader-yui3"
-        ]
-    }, 
+    "yui": {}, 
     "yui-base": {}, 
     "yui-later": {
         "requires": [
@@ -4487,24 +4540,14 @@ YUI.Env[Y.version].modules = YUI.Env[Y.version].modules || {
             "yui-base"
         ]
     }, 
-    "yui-rls": {
-        "use": [
-            "yui-base", 
-            "get", 
-            "features", 
-            "intl-base", 
-            "rls", 
-            "yui-log", 
-            "yui-later"
-        ]
-    }, 
+    "yui-rls": {}, 
     "yui-throttle": {
         "requires": [
             "yui-base"
         ]
     }
 };
-YUI.Env[Y.version].md5 = '296a4b9cf794fe8bf286741e5f08f65d';
+YUI.Env[Y.version].md5 = 'fbf2d694a982e8290f58fd1694becad2';
 
 
 }, '@VERSION@' ,{requires:['loader-base']});

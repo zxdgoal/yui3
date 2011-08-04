@@ -1,6 +1,6 @@
-<div class="intro">
+<div class="intro" style="min-height: 184px;">
 	<p>
-		<img src="{{componentAssets}}/img/graphics.png" alt="Screenshot of the Graphics" style="border: 1px solid #bfbfbf; float:right; height:150px; margin: 0 0 8px 8px; width:275px;">
+		<img src="{{componentAssets}}/img/ship.png" alt="Screencapture of ship drawn with Graphics" style="border: 1px solid #bfbfbf; float:right; height:150px; margin: 0 0 8px 8px; width:275px;">
 		The Graphics module provides a JavaScript API for creating shapes in a variety of formats across all A-grade browsers. Based on device and browser capabilities, Graphics leverages SVG, HTML Canvas and VML to render its graphical elements. 
 	</p>
 	<p>
@@ -41,7 +41,7 @@ var mygraphic = new Y.Graphic({
 
 
 <h3>Creating shapes</h3>
-<p>Shapes are created using the `getShape` method. The `getShape` method takes a config parameter that defines the shape and its properties. When creating a shape, the shape is determined by the `type`
+<p>Shapes are created using the `addShape` method. The `addShape` method takes a config parameter that defines the shape and its properties. When creating a shape, the shape is determined by the `type`
 attribute. The `Graphics` module includes four pre-defined shapes. They can be created by passing a `String` reference.</p>
 <table>
     <tr>
@@ -72,7 +72,7 @@ attribute. The `Graphics` module includes four pre-defined shapes. They can be c
 
 ```
 var mygraphic = new Y.Graphic({render:"#mygraphiccontainer"}),
-    myrect = mygraphic.getShape({
+    myrect = mygraphic.addShape({
         type: "rect",
         width: 300,
         height: 200,
@@ -90,7 +90,7 @@ var mygraphic = new Y.Graphic({render:"#mygraphiccontainer"}),
 <p>This code would create an instance of a custom shape that you have created.</p>
 ```
 var mygraphic = new Y.Graphic({render:"#mygraphiccontainer"}),
-    myrect = mygraphic.getShape({
+    myrect = mygraphic.addShape({
         type: Y.MyCustomShape,
         width: 300,
         height: 200,
@@ -156,7 +156,7 @@ have to interact directly with the underlying technologies or their correspondin
 	<tr>
 	    <td>`resizeDown`</td>
 	    <td>`boolean`</td>
-        <td>When overflow is set to true, by default, `the contentBounds` will resize to greater values but not to smaller values. (for performance) When resizing the `contentBounds` down is desirable, set the resizeDown value to true. The default value is false.</td>
+        <td>The `contentBounds` will resize to greater values but not to smaller values. (for performance) When resizing the `contentBounds` down is desirable, set the resizeDown value to true. The default value is false.</td>
 	</tr>
 	<tr>
 	    <td>`x`</td>
@@ -193,7 +193,7 @@ have to interact directly with the underlying technologies or their correspondin
             <td>Returns an array containing the current position of the graphic instance in page coordinates.</td>
         </tr>
         <tr>
-            <td>getShape</td>
+            <td>addShape</td>
             <td>Generates and returns a shape instance by type.</td>
         </tr>
         <tr>
@@ -280,24 +280,39 @@ have to interact directly with the underlying technologies or their correspondin
             </td>
         </tr>
         <tr>
-            <td>`rotation`</td>
-            <td>`Number` (0 - 360)</td>
-            <td>Rotates the shape.</td>
-        </tr>
-        <tr>
             <td>`transformOrigin`</td>
             <td>`Array`</td>
             <td>The x and y values for the transformOrigin of a transform.</td>
         </tr>
         <tr>
-            <td>`translateX`</td>
-            <td>`Number`</td>
-            <td>The x-coordinate for applying a translate transform.</td>
-        </tr>
-        <tr>
-            <td>`translateY`</td>
-            <td>`Number`</td>
-            <td>The x-coordinate for applying a translate transform.</td>
+            <td>`transform`</td>
+            <td>`String`</td>
+            <td>A string containing, in order, transform operations applied to the shape instance. The `transform` string can contain the following values:
+                <dl>
+                    <dt>rotate</dt><dd>Rotates the shape clockwise around it transformOrigin.</dd>
+                    <dt>translate</dt><dd>Specifies a 2d translation.</dd>
+                    <dt>skew</dt><dd>Skews the shape around the x-axis and y-axis.</dd>
+                    <dt>scale</dt><dd>Specifies a 2d scaling operation.</dd>
+                    <dt>translateX</dt><dd>Translates the shape along the x-axis.</dd>
+                    <dt>translateY</dt><dd>Translates the shape along the y-axis.</dd>
+                    <dt>skewX</dt><dd>Skews the shape around the x-axis.</dd>
+                    <dt>skewY</dt><dd>Skews the shape around the y-axis.</dd>
+                </dl>
+                Applying transforms through the transform attribute will reset the transform matrix and apply a new transform. The shape class also contains corresponding methods for each transform 
+                that will apply the transform to the current matrix. The below code illustrates how you might use the `transform` attribute to instantiate a recangle with a rotation of 45 degrees.
+                ``` 
+                    var myRect = new Y.Rect({
+                        type:"rect",
+                        width: 50,
+                        height: 40,
+                        transform: "rotate(45)"
+                    };
+                ```
+                The code below would apply `translate` and `rotate` to an existing shape.</p>
+                ```
+                    myRect.set("transform", "translate(40, 50) rotate(45)");
+                ```
+            </td>
         </tr>
     </table>
 
@@ -333,35 +348,81 @@ have to interact directly with the underlying technologies or their correspondin
         <td>`set`</td>
         <td>Sets the value of an attribute.</td>
     </tr>
+    <tr>
+        <td>`rotate`</td>
+        <td>Rotates the shape clockwise around it `transformOrigin`.</td>
+    </tr>
+    <tr>
+        <td>`translate`</td>
+        <td>Specifies a 2d translation.</td>
+    </tr>
+    <tr>
+        <td>`translateX`</td>
+        <td>Translates the shape along the x-axis.</td>
+    </tr>
+    <tr>
+        <td>`translateY`</td>
+        <td>Translates the shape along the y-axis.</td>
+    </tr>
+    <tr>
+        <td>`skew`</td>
+        <td>Skews the shape around the x-axis and y-axis.</td>
+    </tr>
+    <tr>
+        <td>`skewX`</td>
+        <td>Skews the shape around the x-axis.</td>
+    </tr>
+    <tr>
+        <td>`skewY`</td>
+        <td>Skews the shape around the y-axis.</td>
+    </tr>
+    <tr>
+        <td>`scale`</td>
+        <td>Specifies a 2d scaling operation.</td>
+    </tr>
 </table>
 
 <h4 id="drawingmethods">Drawing Methods</h4>
 
 <p>Unlike the other included shapes, the `Path` class is not pre-defined. Setting the size, fill and/or stroke of a pre-defined shape will render the shape. This is not true with the `Path`. To render
-a `Path` instance, its drawing methods need to be leveraged. Available drawing methods include:
+a `Path` instance, its drawing methods need to be leveraged. These drawing methods can also be leveraged when creating custom shapes. Available drawing methods include:
 <dl>
     <dt>moveTo</dt><dd>Moves to a coordinate point without drawing a line.</dd>
     <dt>lineTo</dt><dd>Draws a line segment from the current point to the specified point.</dd>
     <dt>curveTo</dt><dd>Draws a curve based on a start point, end point and two control points.</dd>
     <dt>quadraticCurveTo</dt><dd>Draws a quadratic curve based on a start point, end point and two control points.</dd>
-    <dt>end</dt><dd>Ends a drawing operation. The shape will draw after end is called.</dd>
-    <dt>clear</dt><dd>Clears all contents of the path element.</dd>
+    <dt>end</dt><dd>Ends a drawing operation. The path or custom shape will draw after end is called.</dd>
+    <dt>clear</dt><dd>Clears all contents of a path or custom shape.</dd>
 </dl>
 </p>
-<p>These drawing methods can also be leveraged when creating custom shapes.</p>
 
 <h4 id="strokesandfills">Strokes and Fills</h4>
 
 <p>All `Shape` instances contain `stroke` and `fill` attributes. They are used to define the colors for a `Shape`.</p>
 
 <h5 id="definingstrokes">Defining a Stroke</h5>
-<p>The `stroke` attribute has four properties.</p>
+<p>The `stroke` attribute has six properties.</p>
     <dl>
        <dt>color</dt><dd>The color of the stroke.</dd>
        <dt>weight</dt><dd>Number that indicates the width of the stroke.</dd>
        <dt>opacity</dt><dd>Number between 0 and 1 that indicates the opacity of the stroke. The default value is 1.</dd>
        <dt>dashstyle</dt>Indicates whether to draw a dashed stroke. When set to "none", a solid stroke is drawn. When set to an array, the first index indicates the
        length of the dash. The second index indicates the length of gap.
+       <dt>linecap</dt><dd>Specifies the linecap for the stroke. The following values can be specified:
+            <dl>
+                <dt>butt (default)</dt><dd>Specifies a butt linecap.</dd>
+                <dt>square</dt><dd>Specifies a sqare linecap.</dd>
+                <dt>round</dt><dd>Specifies a round linecap.</dd>
+            </dl>
+       </dd>
+       <dt>linejoin</dt><dd>Specifies a linejoin for the stroke. The following values can be specified:
+            <dl>
+                <dt>round (default)</dt><dd>Specifies that the linejoin will be round.</dd>
+                <dt>bevel</dt><dd>Specifies a bevel for the linejoin.</dd>
+                <dt>miter limit</dt><dd>An integer specifying the miter limit of a miter linejoin. If you want to specify a linejoin of miter, you simply specify the limit as opposed to having
+                separate miter and miter limit values.</dd>
+            </dl>
+       </dd>
     </dl>
 <p>The code below would set a 2 pixel solid red stroke on `myshape`.</p>
 ```
@@ -406,25 +467,31 @@ a `Path` instance, its drawing methods need to be leveraged. Available drawing m
            <dt>rotation</dt><dd>Linear gradients flow left to right by default. The rotation property allows you to change the flow by rotation. (e.g. A rotation of 180 would make the gradient pain from right to left.)</dd>
            
            <p>Radial gradients have the following additional properties:</p>
-           <dt>cx</dt><dd>The x-coordinate of the center of the gradient circle.</dd>
-           <dt>cy</dt><dd>The y-coordinate of the center of the gradient circle.</dd>
            <dt>r</dt><dd>Radius of the gradient circle.</dd>
            <dt>fx</dt><dd>Focal point x-coordinate of the gradient.</dd>
            <dt>fy</dt><dd>Focal point y-coordinate of the gradient.</dd>
+           <dt>cx</dt><dd>The x-coordinate of the center of the gradient circle. Determines where the color stop begins. The default value 0.5.
+               <p><strong>Note: </strong>This property currently has no effect on Android or IE 6 - 8.</p>
+           </dd>
+           <dt>cy</dt><dd>The y-coordinate of the center of the gradient circle. Determines where the color stop begins. The default value 0.5.
+               <p><strong>Note: </strong>This property currently has no effect on Android or IE 6 - 8.</p>
+           </dd>
         </dl>
 
 <h2 id="issues">Known Issues</h2>
 <ul class="spaced">
     <li>
-        <p>Radial gradients need to be finalized. The current implementation can only be approximated to work in vml. Need to ensure normalizations are not adversely affecting other technologies.</p>
+        <p>Gradients need more need more normalization across technologies. Certain gradient types have limitations on different browsers. 
+        </p>
+        <ul>
+            <li>Radial gradients contain the properties `cx` and `cy`. These properties currently have no impact on Android or IE 6 - 8.</li>
+            <li>After being initially set, gradients cannot be updated in IE 6 - 8.</li>
+        </ul>
     </li>
     <li>
-        <p>Linear gradient rotations need some minor bug fixes.</p>
+        <p>Applying multiple transforms in IE 6 - 8 can have inconsistent results compared to other browsers.</p>
     </li>
     <li>
-        <p>The Canvas implementation of the path element lacks the ability to have interactivity.</p>
-    </li>
-    <li>
-        <p>`Graphic` should extend `Base`. It currently does not.</p>
+        <p>Path element currently lacks the ability to have interactivity in Android.</p>
     </li>
 </ul>

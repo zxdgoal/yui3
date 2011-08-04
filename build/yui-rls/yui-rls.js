@@ -11,30 +11,30 @@ if (typeof YUI != 'undefined') {
 }
 
 /**
- * The YUI global namespace object.  If YUI is already defined, the
- * existing YUI object will not be overwritten so that defined
- * namespaces are preserved.  It is the constructor for the object
- * the end user interacts with.  As indicated below, each instance
- * has full custom event support, but only if the event system
- * is available.  This is a self-instantiable factory function.  You
- * can invoke it directly like this:
- *
- *      YUI().use('*', function(Y) {
- *          // ready
- *      });
- *
- * But it also works like this:
- *
- *      var Y = YUI();
- *
- * @class YUI
- * @constructor
- * @global
- * @uses EventTarget
- * @param o* {object} 0..n optional configuration objects.  these values
- * are store in Y.config.  See <a href="config.html">Config</a> for the list of supported
- * properties.
- */
+The YUI global namespace object.  If YUI is already defined, the
+existing YUI object will not be overwritten so that defined
+namespaces are preserved.  It is the constructor for the object
+the end user interacts with.  As indicated below, each instance
+has full custom event support, but only if the event system
+is available.  This is a self-instantiable factory function.  You
+can invoke it directly like this:
+
+     YUI().use('*', function(Y) {
+         // ready
+     });
+
+But it also works like this:
+
+     var Y = YUI();
+
+@class YUI
+@constructor
+@global
+@uses EventTarget
+@param o* {object} 0..n optional configuration objects.  these values
+are store in Y.config.  See <a href="config.html">Config</a> for the list of supported
+properties.
+*/
     /*global YUI*/
     /*global YUI_config*/
     var YUI = function() {
@@ -53,17 +53,61 @@ if (typeof YUI != 'undefined') {
             // set up the core environment
             Y._init();
 
-            // YUI.GlobalConfig is a master configuration that might span
-            // multiple contexts in a non-browser environment.  It is applied
-            // first to all instances in all contexts.
+            /**
+                YUI.GlobalConfig is a master configuration that might span
+                multiple contexts in a non-browser environment.  It is applied
+                first to all instances in all contexts.
+                @property YUI.GlobalConfig
+                @type {Object}
+                @global
+                @example
+
+                    
+                    YUI.GlobalConfig = {
+                        filter: 'debug'
+                    };
+
+                    YUI().use('node', function(Y) {
+                        //debug files used here
+                    });
+
+                    YUI({
+                        filter: 'min'
+                    }).use('node', function(Y) {
+                        //min files used here
+                    });
+
+            */
             if (YUI.GlobalConfig) {
                 Y.applyConfig(YUI.GlobalConfig);
             }
+            
+            /**
+                YUI_config is a page-level config.  It is applied to all
+                instances created on the page.  This is applied after
+                YUI.GlobalConfig, and before the instance level configuration
+                objects.
+                @global
+                @property YUI_config
+                @type {Object}
+                @example
 
-            // YUI_Config is a page-level config.  It is applied to all
-            // instances created on the page.  This is applied after
-            // YUI.GlobalConfig, and before the instance level configuration
-            // objects.
+                    
+                    //Single global var to include before YUI seed file
+                    YUI_config = {
+                        filter: 'debug'
+                    };
+                    
+                    YUI().use('node', function(Y) {
+                        //debug files used here
+                    });
+
+                    YUI({
+                        filter: 'min'
+                    }).use('node', function(Y) {
+                        //min files used here
+                    });
+            */
             if (gconf) {
                 Y.applyConfig(gconf);
             }
@@ -182,7 +226,7 @@ proto = {
      * update the loader cache if necessary.  Updating Y.config directly
      * will not update the cache.
      * @method applyConfig
-     * @param {object} the configuration object.
+     * @param {object} o the configuration object.
      * @since 3.2.0
      */
     applyConfig: function(o) {
@@ -382,8 +426,13 @@ proto = {
             bootstrap: true,
             cacheUse: true,
             fetchCSS: true,
-            use_rls: true
+            use_rls: true,
+            rls_timeout: 2000
         };
+
+        if (YUI.Env.rls_disabled) {
+            Y.config.use_rls = false;
+        }
 
         Y.config.lang = Y.config.lang || 'en-US';
 
@@ -452,33 +501,41 @@ proto = {
         return null;
     },
 
-    /**
-     * Registers a module with the YUI global.  The easiest way to create a
-     * first-class YUI module is to use the YUI component build tool.
-     *
-     * http://yuilibrary.com/projects/builder
-     *
-     * The build system will produce the `YUI.add` wrapper for you module, along
-     * with any configuration info required for the module.
-     * @method add
-     * @param name {String} module name.
-     * @param fn {Function} entry point into the module that
-     * is used to bind module to the YUI instance.
-     * @param version {String} version string.
-     * @param details {Object} optional config data:
-     * @param details.requires {Array} features that must be present before this module can be attached.
-     * @param details.optional {Array} optional features that should be present if loadOptional
-     * is defined.  Note: modules are not often loaded this way in YUI 3,
-     * but this field is still useful to inform the user that certain
-     * features in the component will require additional dependencies.
-     * @param details.use {Array} features that are included within this module which need to
-     * be attached automatically when this module is attached.  This
-     * supports the YUI 3 rollup system -- a module with submodules
-     * defined will need to have the submodules listed in the 'use'
-     * config.  The YUI component build tool does this for you.
-     * @return {YUI} the YUI instance.
-     *
-     */
+/**
+Registers a module with the YUI global.  The easiest way to create a
+first-class YUI module is to use the YUI component build tool.
+
+http://yuilibrary.com/projects/builder
+
+The build system will produce the `YUI.add` wrapper for you module, along
+with any configuration info required for the module.
+@method add
+@param name {String} module name.
+@param fn {Function} entry point into the module that is used to bind module to the YUI instance.
+@param {YUI} fn.Y The YUI instance this module is executed in.
+@param {String} fn.name The name of the module
+@param version {String} version string.
+@param details {Object} optional config data:
+@param details.requires {Array} features that must be present before this module can be attached.
+@param details.optional {Array} optional features that should be present if loadOptional
+ is defined.  Note: modules are not often loaded this way in YUI 3,
+ but this field is still useful to inform the user that certain
+ features in the component will require additional dependencies.
+@param details.use {Array} features that are included within this module which need to
+ be attached automatically when this module is attached.  This
+ supports the YUI 3 rollup system -- a module with submodules
+ defined will need to have the submodules listed in the 'use'
+ config.  The YUI component build tool does this for you.
+@return {YUI} the YUI instance.
+@example
+
+    YUI.add('davglass', function(Y, name) {
+        Y.davglass = function() {
+            alert('Dav was here!');
+        };
+    }, '3.4.0', { requires: ['yui-base', 'harley-davidson', 'mt-dew'] });
+
+*/
     add: function(name, fn, version, details) {
         details = details || {};
         var env = YUI.Env,
@@ -914,7 +971,7 @@ proto = {
             loader.insert(null, (fetchCSS) ? null : 'js');
             // loader.partial(missing, (fetchCSS) ? null : 'js');
 
-        } else if (len && Y.config.use_rls) {
+        } else if (len && Y.config.use_rls && !YUI.Env.rls_enabled) {
 
             G_ENV._rls_queue = G_ENV._rls_queue || new Y.Queue();
 
@@ -923,10 +980,7 @@ proto = {
 
                 var rls_end = function(o) {
                     handleLoader(o);
-                    G_ENV._rls_in_progress = false;
-                    if (G_ENV._rls_queue.size()) {
-                        G_ENV._rls_queue.next()();
-                    }
+                    instance.rls_advance();
                 },
                 rls_url = instance._rls(argz);
 
@@ -935,17 +989,22 @@ proto = {
                         rls_end(o);
                     });
                     instance.Get.script(rls_url, {
-                        data: argz
+                        data: argz,
+                        timeout: instance.config.rls_timeout,
+                        onFailure: instance.rls_handleFailure,
+                        onTimeout: instance.rls_handleTimeout
                     });
                 } else {
                     rls_end({
+                        success: true,
                         data: argz
                     });
                 }
             };
 
             G_ENV._rls_queue.add(function() {
-                G_ENV._rls_in_progress = true;                
+                G_ENV._rls_in_progress = true;
+                Y.rls_callback = callback;
                 Y.rls_locals(Y, args, handleRLS);
             });
 
@@ -961,6 +1020,7 @@ proto = {
                 Y._loading = false;
                 queue.running = false;
                 Env.bootstrapped = true;
+                G_ENV._bootstrapping = false;
                 if (Y._attach(['loader'])) {
                     Y._use(args, callback);
                 }
@@ -1980,7 +2040,8 @@ L.sub = function(s, o) {
  * Returns the current time in milliseconds.
  *
  * @method now
- * @return {int} Current time in milliseconds.
+ * @return {Number} Current time in milliseconds.
+ * @static
  * @since 3.3.0
  */
 L.now = Date.now || function () {
@@ -3292,8 +3353,7 @@ YUI.Env.aliases = {
     "resize": ["resize-base","resize-proxy","resize-constrain"],
     "slider": ["slider-base","slider-value-range","clickable-rail","range-slider"],
     "text": ["text-accentfold","text-wordbreak"],
-    "widget": ["widget-base","widget-htmlparser","widget-uievents","widget-skin"],
-    "yui-rls": ["yui-base","get","features","intl-base","rls","yui-log","yui-later"]
+    "widget": ["widget-base","widget-htmlparser","widget-uievents","widget-skin"]
 };
 
 
@@ -3662,7 +3722,11 @@ var ua = Y.UA,
     _loaded = function(id, url) {
 
         var q = queues[id],
-            sync = !q.async;
+            sync = (q && !q.async);
+
+        if (!q) {
+            return;
+        }
 
         if (sync) {
             _clearTimeout(q);
@@ -4219,7 +4283,7 @@ Y.mix(Y.namespace('Features'), {
 // Y.Features.test("load", "1");
 // caps=1:1;2:0;3:1;
 
-/* This file is auto-generated by src/loader/meta_join.py */
+/* This file is auto-generated by src/loader/scripts/meta_join.py */
 var add = Y.Features.add;
 // graphics-svg.js
 add('load', '0', {
@@ -4461,6 +4525,32 @@ YUI.add('rls', function(Y) {
 * @class rls
 */
 
+
+Y.rls_handleTimeout = function(o) {
+    Y.Get.abort(o.tId);
+    o.purge();
+    o.message = 'RLS request timed out, fetching loader';
+    Y.rls_failure(o);
+};
+
+Y.rls_handleFailure = function(o) {
+    o.message = 'RLS request failed, fetching loader';
+    Y.rls_failure(o);
+};
+
+Y.rls_failure = function(o) {
+    YUI.Env.rls_disabled = true;
+    Y.config.use_rls = false;
+    if (o.data) {
+        o.data.unshift('loader');
+        Y._use(o.data, function(Y, response) {
+            Y._notify(Y.rls_callback, response, o.data);
+            //Call the RLS done method, so it can progress the queue
+            Y.rls_advance();
+        });
+    }
+};
+
 /**
 * Checks the environment for local modules and deals with them before firing off an RLS request.
 * This needs to make sure that all dependencies are calculated before it can make an RLS request in
@@ -4474,6 +4564,14 @@ YUI.add('rls', function(Y) {
 * @param {Array} cb.argz The modified list or modules needed to require
 */
 Y.rls_locals = function(instance, argz, cb) {
+    if (YUI.Env.rls_disabled) {
+        var data = {
+            message: 'RLS is disabled, moving to loader',
+            data: argz
+        };
+        Y.rls_failure(data);
+        return;
+    }
     if (instance.config.modules) {
         var files = [], asked = Y.Array.hash(argz),
             PATH = 'fullpath', f,
@@ -4523,7 +4621,17 @@ Y.rls_locals = function(instance, argz, cb) {
 */
 Y.rls_needs = function(mod, instance) {
     var self = instance || this,
-        config = self.config;
+        config = self.config, i,
+        m = YUI.Env.aliases[mod];
+
+    if (m) {
+        for (i = 0; i < m.length; i++) {
+            if (Y.rls_needs(m[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     if (!YUI.Env.mods[mod] && !(config.modules && config.modules[mod])) {
         return true;
@@ -4540,7 +4648,7 @@ Y.rls_needs = function(mod, instance) {
  * @return {string} the url for the remote loader service call, returns false if no modules are required to be fetched (they are in the ENV already).
  */
 Y._rls = function(what) {
-    what.push('intl');
+    //what.push('intl');
     var config = Y.config,
         mods = config.modules,
         YArray = Y.Array,
@@ -4557,6 +4665,7 @@ Y._rls = function(what) {
             '2v': config.yui2,
             filt: config.filter,
             filts: config.filters,
+            ignore: config.ignore,
             tests: 1 // required in the template
         },
         // The rls base path
@@ -4570,13 +4679,28 @@ Y._rls = function(what) {
                     s.push(param + '={' + param + '}');
                 }
             }
-            // console.log('rls_tmpl: ' + s);
             return s.join('&');
         }(),
-        m = [], asked = {}, o, d, mod,
-        w = [], gallery = [],
+        m = [], asked = {}, o, d, mod, a, j,
+        w = [], 
         i, len = what.length,
         url;
+    
+    //Explode our aliases..
+    for (i = 0; i < len; i++) {
+        a = YUI.Env.aliases[what[i]];
+        if (a) {
+            for (j = 0; j < a.length; j++) {
+                w.push(a[j]);
+            }
+        } else {
+            w.push(what[i]);
+        }
+
+    }
+    what = w;
+    len = what.length;
+
     
     for (i = 0; i < len; i++) {
         asked[what[i]] = 1;
@@ -4588,7 +4712,7 @@ Y._rls = function(what) {
 
     if (mods) {
         for (i in mods) {
-            if (asked[i] && mods[i].requires) {
+            if (asked[i] && mods[i].requires && !mods[i].noop) {
                 len = mods[i].requires.length;
                 for (o = 0; o < len; o++) {
                     mod = mods[i].requires[o];
@@ -4598,12 +4722,14 @@ Y._rls = function(what) {
                         d = YUI.Env.mods[mod] || mods[mod];
                         if (d) {
                             d = d.details || d;
-                            if (d.requires) {
-                                YArray.each(d.requires, function(o) {
-                                    if (Y.rls_needs(o)) {
-                                        m.push(o);
-                                    }
-                                });
+                            if (!d.noop) {
+                                if (d.requires) {
+                                    YArray.each(d.requires, function(o) {
+                                        if (Y.rls_needs(o)) {
+                                            m.push(o);
+                                        }
+                                    });
+                                }
                             }
                         }
                     }
@@ -4615,38 +4741,30 @@ Y._rls = function(what) {
     YObject.each(YUI.Env.mods, function(i) {
         if (asked[i.name]) {
             if (i.details && i.details.requires) {
-                YArray.each(i.details.requires, function(o) {
-                    if (Y.rls_needs(o)) {
-                        m.push(o);
-                    }
-                });
+                if (!i.noop) {
+                    YArray.each(i.details.requires, function(o) {
+                        if (Y.rls_needs(o)) {
+                            m.push(o);
+                        }
+                    });
+                }
             }
         }
     });
 
-    m = YArray.dedupe(m);
-    
-    YArray.each(m, function(mod) {
-        if (mod.indexOf('gallery-') === 0 || mod.indexOf('yui2-') === 0) {
-            gallery.push(mod);
-            if (!Y.Loader) {
-                //Fetch Loader..
-                w.push('loader-base');
-                what.push('loader-base');
-            }
-        } else {
-            w.push(mod);
-        }
-    });
-    m = w;
-
+    //Add in the debug modules
     if (rls.filt === 'debug') {
         m.unshift('dump', 'yui-log');
     }
+    //If they have a groups config, add the loader-base module
+    if (Y.config.groups) {
+        m.unshift('loader-base');
+    }
+
+    m = YArray.dedupe(m);
 
     //Strip Duplicates
     m = YArray.dedupe(m);
-    gallery = YArray.dedupe(gallery);
     what = YArray.dedupe(what);
 
     if (!m.length) {
@@ -4666,7 +4784,6 @@ Y._rls = function(what) {
     YUI._rls_active = {
         asked: what,
         attach: m,
-        gallery: gallery,
         inst: Y,
         url: url
     };
@@ -4682,12 +4799,22 @@ Y.rls_oncomplete = function(cb) {
     YUI._rls_active.cb = cb;
 };
 
+Y.rls_advance = function() {
+    var G_ENV = YUI.Env;
+
+    G_ENV._rls_in_progress = false;
+    if (G_ENV._rls_queue.size()) {
+        G_ENV._rls_queue.next()();
+    }
+};
+
 /**
 * Calls the callback registered with Y.rls_oncomplete when the RLS request (and it's dependency requests) is done.
 * @method rls_done
 * @param {Array} data The modules loaded
 */
 Y.rls_done = function(data) {
+    data.success = true;
     YUI._rls_active.cb(data);
 };
 
@@ -4727,12 +4854,17 @@ if (!YUI.$rls) {
         var rls_active = YUI._rls_active,
             Y = rls_active.inst;
         if (Y) {
-            if (req.css) {
-                Y.Get.css(rls_active.url + '&css=1');
+            if (req.error) {
+                Y.rls_failure({
+                    message: req.error,
+                    data: req.modules
+                });
             }
-            if (rls_active.gallery.length) {
-                req.modules = req.modules || [];
-                req.modules = [].concat(req.modules, rls_active.gallery);
+            if (YUI.Env && YUI.Env.rls_disabled) {
+                return;
+            }
+            if (req.css && Y.config.fetchCSS) {
+                Y.Get.css(rls_active.url + '&css=1');
             }
             if (req.modules && !req.css) {
                 if (req.modules.length) {
@@ -4750,17 +4882,28 @@ if (!YUI.$rls) {
                         YUI._rls_skins.push(v);
                     }
                 });
-                Y._attach([].concat(req.modules, rls_active.attach));
-                if (rls_active.gallery.length && Y.Loader) {
+
+                Y._attach([].concat(req.modules, rls_active.asked));
+                
+                var additional = req.missing;
+
+                if (Y.config.groups) {
+                    if (!additional) {
+                        additional = [];
+                    }
+                    additional = [].concat(additional, rls_active.what);
+                }
+
+                if (additional && Y.Loader) {
                     var loader = new Y.Loader(rls_active.inst.config);
                     loader.onEnd = Y.rls_done;
                     loader.context = Y;
-                    loader.data = rls_active.gallery;
+                    loader.data = additional;
                     loader.ignoreRegistered = false;
-                    loader.require(rls_active.gallery);
+                    loader.require(additional);
                     loader.insert(null, (Y.config.fetchCSS) ? null : 'js');
                 } else {
-                    Y.rls_done({ data: rls_active.asked });
+                    Y.rls_done({ data: req.modules });
                 }
             }
         }

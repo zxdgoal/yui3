@@ -249,7 +249,8 @@
             "ru"
         ], 
         "requires": [
-            "calendar-base"
+            "calendar-base", 
+            "calendarnavigator"
         ], 
         "skinnable": true
     }, 
@@ -262,7 +263,15 @@
             "widget", 
             "substitute", 
             "datatype-date", 
-            "datatype-date-math"
+            "datatype-date-math", 
+            "cssgrids"
+        ], 
+        "skinnable": true
+    }, 
+    "calendarnavigator": {
+        "requires": [
+            "plugin", 
+            "classnamemanager"
         ], 
         "skinnable": true
     }, 
@@ -296,14 +305,6 @@
             "arraylist-add", 
             "arraylist-filter", 
             "array-invoke"
-        ]
-    }, 
-    "compat": {
-        "requires": [
-            "event-base", 
-            "dom", 
-            "dump", 
-            "substitute"
         ]
     }, 
     "console": {
@@ -1577,7 +1578,8 @@
     "scrollview-list": {
         "requires": [
             "plugin"
-        ]
+        ], 
+        "skinnable": true
     }, 
     "scrollview-paginator": {
         "requires": [
@@ -1889,19 +1891,7 @@
             "jsonp-url"
         ]
     }, 
-    "yui": {
-        "use": [
-            "yui-base", 
-            "get", 
-            "features", 
-            "intl-base", 
-            "yui-log", 
-            "yui-later", 
-            "loader-base", 
-            "loader-rollup", 
-            "loader-yui3"
-        ]
-    }, 
+    "yui": {}, 
     "yui-base": {}, 
     "yui-later": {
         "requires": [
@@ -1913,17 +1903,7 @@
             "yui-base"
         ]
     }, 
-    "yui-rls": {
-        "use": [
-            "yui-base", 
-            "get", 
-            "features", 
-            "intl-base", 
-            "rls", 
-            "yui-log", 
-            "yui-later"
-        ]
-    }, 
+    "yui-rls": {}, 
     "yui-throttle": {
         "requires": [
             "yui-base"
