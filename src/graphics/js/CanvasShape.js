@@ -1,5 +1,9 @@
 /**
- * Base class for creating shapes.
+ * <a href="http://www.w3.org/TR/html5/the-canvas-element.html">Canvas</a> implementation of the <a href="Shape.html">`Shape`</a> class. 
+ * `CanvasShape` is not intended to be used directly. Instead, use the <a href="Shape.html">`Shape`</a> class. 
+ * If the browser lacks <a href="http://www.w3.org/TR/SVG/">SVG</a> capabilities but has 
+ * <a href="http://www.w3.org/TR/html5/the-canvas-element.html">Canvas</a> capabilities, the <a href="Shape.html">`Shape`</a> 
+ * class will point to the `CanvasShape` class.
  *
  * @module graphics
  * @class CanvasShape
@@ -374,7 +378,7 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix({
 	 * use the `translate` method.
 	 *
 	 * @method translateX
-	 * @param {Number} y The value to translate.
+	 * @param {Number} x The value to translate.
 	 */
 	translateX: function(x)
     {
@@ -725,12 +729,9 @@ Y.extend(CanvasShape, Y.BaseGraphic, Y.mix({
 		context.moveTo(xEnd, yEnd);
 	},
 
-	/**
-	 * Clears the graphics object.
-	 *
-	 * @method clear
-	 */
-	clear: function() {
+	//This should move to CanvasDrawing class. 
+    //Currently docmented in CanvasDrawing class.
+    clear: function() {
 		this._initProps();
         if(this.node) 
         {
@@ -1119,29 +1120,33 @@ CanvasShape.ATTRS =  {
 
 		setter: function(val)
 		{
-			var tmpl = this.get("stroke") || this._getDefaultStroke();
+			var tmpl = this.get("stroke") || this._getDefaultStroke(),
+                wt;
+            if(val && val.hasOwnProperty("weight"))
+            {
+                wt = parseInt(val.weight, 10);
+                if(!isNaN(wt))
+                {
+                    val.weight = wt;
+                }
+            }
 			val = (val) ? Y.merge(tmpl, val) : null;
 			this._setStrokeProps(val);
 			return val;
 		}
 	},
 	
-	/**
-	 * Indicates whether or not the instance will size itself based on its contents.
-	 *
-	 * @config autoSize 
-	 * @type Boolean
-	 */
+	//Not used. Remove in future.
 	autoSize: {
 		value: false
 	},
 
-	/**
-	 * Determines whether the instance will receive mouse events.
-	 * 
-	 * @config pointerEvents
-	 * @type string
-	 */
+	// Only implemented in SVG
+	// Determines whether the instance will receive mouse events.
+	// 
+	// @config pointerEvents
+	// @type string
+	//
 	pointerEvents: {
 		value: "visiblePainted"
 	},
