@@ -18887,9 +18887,9 @@ Transition.prototype = {
     },
 
     _prepDur: function(dur) {
-        dur = parseFloat(dur);
+        dur = parseFloat(dur) * 1000;
 
-        return dur + 's';
+        return dur + 'ms';
     },
 
     _runNative: function(time) {
@@ -20458,5 +20458,22 @@ YUI.add('yui', function (Y, NAME) {
 
 
 
-}, '@VERSION@', {"use": ["yui", "oop", "dom", "event-custom-base", "event-base", "pluginhost", "node", "event-delegate", "io-base", "json-parse", "transition", "selector-css3", "dom-style-ie", "querystring-stringify-simple"]});
+}, '@VERSION@', {
+    "use": [
+        "yui",
+        "oop",
+        "dom",
+        "event-custom-base",
+        "event-base",
+        "pluginhost",
+        "node",
+        "event-delegate",
+        "io-base",
+        "json-parse",
+        "transition",
+        "selector-css3",
+        "dom-style-ie",
+        "querystring-stringify-simple"
+    ]
+});
 var Y = YUI().use('*');
