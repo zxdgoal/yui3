@@ -758,6 +758,9 @@
         * @param {EventFacade} ev  The Event
         */
         _handleMouseDownEvent: function(ev) {
+            if (this.validClick(ev)) {
+                ev.preventDefault();
+            }
             this.fire(EV_MOUSE_DOWN, { ev: ev });
         },
         /**
