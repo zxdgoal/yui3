@@ -8618,21 +8618,33 @@ Y.DOM._getAttrOffset = function(node, attr) {
     return val;
 };
 
-Y.DOM._getOffset = function(node) {
+Y.DOM._getOffset = function(node, dir) {
     var pos,
-        xy = null;
+        xy = null,
+        offset = {
+            left: 'offsetLeft',
+            right: 'offsetRight'
+        },
+        margins = {
+            left: 'marginLeft',
+            right: 'marginRight'
+        },
+        margin;
+
+    dir = dir || 'left';
 
     if (node) {
         pos = Y_DOM.getStyle(node, 'position');
+        margin = parseInt(Y_DOM[GET_COMPUTED_STYLE](node, margins[dir]), 10);
         xy = [
-            parseInt(Y_DOM[GET_COMPUTED_STYLE](node, 'left'), 10),
+            parseInt(Y_DOM[GET_COMPUTED_STYLE](node, dir), 10),
             parseInt(Y_DOM[GET_COMPUTED_STYLE](node, 'top'), 10)
         ];
 
         if ( isNaN(xy[0]) ) { // in case of 'auto'
-            xy[0] = parseInt(Y_DOM.getStyle(node, 'left'), 10); // try inline
+            xy[0] = parseInt(Y_DOM.getStyle(node, dir), 10); // try inline
             if ( isNaN(xy[0]) ) { // default to offset value
-                xy[0] = (pos === 'relative') ? 0 : node.offsetLeft || 0;
+                xy[0] = (pos === 'relative') ? 0 : (node[offset[dir]] - margin) || 0;
             }
         } 
 
@@ -9299,20 +9311,41 @@ Y.mix(Y_DOM, {
             pos,
             delta,
             newXY,
-            currentXY;
+            currentXY,
+            offsetDir,
+            dir,
+            x;
 
         if (node && xy) {
             pos = Y_DOM.getStyle(node, POSITION);
 
-            delta = Y_DOM._getOffset(node);       
+            offsetDir = Y_DOM.OFFSET_XY;
+
+            if (!offsetDir) {
+                dir = Y_DOM.getComputedStyle(node, 'direction');
+
+                offsetDir = (dir === 'rtl' ? 'right' : LEFT);
+            }
+
+            delta = Y_DOM._getOffset(node, offsetDir);
             if (pos == 'static') { // default to relative
                 pos = RELATIVE;
                 setStyle(node, POSITION, pos);
             }
-            currentXY = Y_DOM.getXY(node);
+            currentXY = Y_DOM._getDirXY(node, offsetDir);
 
-            if (xy[0] !== null) {
-                setStyle(node, LEFT, xy[0] - currentXY[0] + delta[0] + 'px');
+            x = xy[0];
+
+            if (offsetDir === 'right') {
+                x = Y_DOM.winWidth() - (xy[0] + parseInt(Y_DOM.getComputedStyle(node, 'width'), 10));
+
+                if (!delta[0] && !noRetry) {
+                    noRetry = false;
+                }
+            }
+
+            if (x !== null) {
+                setStyle(node, offsetDir, x - currentXY[0] + delta[0] + 'px');
             }
 
             if (xy[1] !== null) {
@@ -9408,6 +9441,16 @@ Y.mix(Y_DOM, {
         }
 
         return { height: root.scrollHeight, width: root.scrollWidth };
+    },
+
+    _getDirXY: function(node, dir) {
+        var xy = Y_DOM.getXY(node);
+
+        if (dir === 'right') {
+            xy[0] = (Y_DOM.winWidth() - (xy[0] + parseInt(Y_DOM.getComputedStyle(node, 'width'), 10)));
+        }
+
+        return xy;
     }
 });
 
@@ -11455,7 +11498,7 @@ var L = Y.Lang,
      */
     _getType = function(type, pre) {
 
-        if (!pre || type.indexOf(PREFIX_DELIMITER) > -1) {
+        if (!pre || (typeof type !== "string") || type.indexOf(PREFIX_DELIMITER) > -1) {
             return type;
         }
 
@@ -15160,12 +15203,12 @@ Y_Node.ATTRS = {
                 children = node.children,
                 childNodes, i, len;
 
-            if (!children) {
+            if (!children || (Y.UA.ie && Y.UA.ie < 9)) {
                 childNodes = node.childNodes;
                 children = [];
 
                 for (i = 0, len = childNodes.length; i < len; ++i) {
-                    if (childNodes[i].tagName) {
+                    if (childNodes[i].tagName && (childNodes[i].nodeType === 1)) {
                         children[children.length] = childNodes[i];
                     }
                 }
