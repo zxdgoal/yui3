@@ -101,6 +101,39 @@ suite.add(new Y.Test.Case({
 
         modal1.destroy();
         modal2.destroy();
+    },
+
+    'WidgetModality should prevent focus on iframes': function() {
+        var iframes = Y.all('iframe'),
+            index,
+            previousTabIndex = [];
+
+        for (var index = 0; index < iframes.size(); index++) {
+            previousTabIndex.push(iframes.item(index).get('tabIndex'));
+        }
+
+        this.widget = new TestWidget({
+            modal : true,
+            render: '#test'
+        });
+
+        this.widget.show();
+        for (var index = 0; index < iframes.size(); index++) {
+            Y.Assert.areEqual(
+                -1,
+                iframes.item(index).get('tabIndex'),
+                'tabIndex should be set to -1 when widget is visible'
+            );
+        }
+
+        this.widget.hide();
+        for (var index = 0; index < iframes.size(); index++) {
+            Y.Assert.areEqual(
+                previousTabIndex[index],
+                iframes.item(index).get('tabIndex'),
+                'tabIndex should be restored when widget is hidden'
+            );
+        }
     }
 }));
 
