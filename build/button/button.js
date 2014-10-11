@@ -129,12 +129,11 @@ Y.extend(Button, Y.Widget,  {
      * @static
      */
     ATTRS: {
-
         /**
          * The text of the button (the `value` or `text` property)
          *
          * @attribute label
-         * @type String
+         * @type {HTML|String}
          */
         label: {
             value: Y.ButtonCore.ATTRS.label.value
@@ -149,8 +148,7 @@ Y.extend(Button, Y.Widget,  {
      */
     HTML_PARSER: {
         label: function(node) {
-            this._host = node; // TODO: remove
-            return this._getLabel();
+            return this._getLabelFromNode(node);
         },
 
         disabled: function(node) {
