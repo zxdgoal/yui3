@@ -25,7 +25,7 @@ var w = Y.config.win,
  * @param {Object} io
  */
 function _cFrame(o, c, io) {
-    var i = Y.Node.create('<iframe src="#" id="io_iframe' + o.id + '" name="io_iframe' + o.id + '" />');
+    var i = Y.Node.create('<iframe id="io_iframe' + o.id + '" name="io_iframe' + o.id + '" />');
         i._node.style.position = 'absolute';
         i._node.style.top = '-1000px';
         i._node.style.left = '-1000px';
@@ -199,7 +199,7 @@ Y.mix(Y.IO.prototype, {
 				// When a response Content-Type of "text/plain" is used, Firefox and Safari
 				// will wrap the response string with <pre></pre>.
 				p = b.one('pre:first-child');
-				o.c.responseText = p ? p.get('text') : b.get('text');
+				o.c.responseText = p ? p.getHTML() : b.getHTML();
 			}
 			else {
 				o.c.responseXML = d._node;
