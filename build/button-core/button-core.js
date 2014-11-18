@@ -72,6 +72,10 @@ ButtonCore.prototype = {
      * @private
      */
     _initAttributes: function(config) {
+        var host = this._host,
+            node = host.one('.' + ButtonCore.CLASS_NAMES.LABEL) || host;
+            
+        config.label = config.label || this._getLabel(node);
         Y.AttributeCore.call(this, ButtonCore.ATTRS, config);
     },
 
@@ -87,7 +91,7 @@ ButtonCore.prototype = {
 
         // Set some default node attributes
         node.addClass(ButtonCore.CLASS_NAMES.BUTTON);
-
+        
         if (tagName !== 'button' && tagName !== 'input') {
             node.set('role', 'button');
         }
@@ -119,43 +123,31 @@ ButtonCore.prototype = {
     getNode: function() {
         return this._host;
     },
-
+    
     /**
      * @method _getLabel
      * @description Getter for a button's 'label' ATTR
      * @private
      */
     _getLabel: function () {
-        var node = this.getNode();
-
-        return this._getLabelFromNode(node);
-    },
-
-    /**
-     * @method _getLabelFromNode
-     * @description Getter for a button's 'label' ATTR
-     * @param node {Node} The Y.Node instance to obtain the label from
-     * @return {HTML|String} The label for a given node
-     * @private
-     */
-    _getLabelFromNode: function (node) {
-        var tagName = node.get('tagName').toLowerCase(),
+        var node    = this.getNode(),
+            tagName = node.get('tagName').toLowerCase(),
             label;
 
         if (tagName === 'input') {
             label = node.get('value');
         }
         else {
-            label = (node.one('.' + ButtonCore.CLASS_NAMES.LABEL) || node).getHTML();
+            label = (node.one('.' + ButtonCore.CLASS_NAMES.LABEL) || node).get('text');
         }
-
+        
         return label;
     },
-
+    
     /**
      * @method _uiSetLabel
      * @description Setter for a button's 'label' ATTR
-     * @param label {HTML|String} The label to set
+     * @param label {string}
      * @private
      */
     _uiSetLabel: function (label) {
@@ -165,7 +157,7 @@ ButtonCore.prototype = {
         if (tagName === 'input') {
             node.set('value', label);
         } else {
-            (node.one('.' + ButtonCore.CLASS_NAMES.LABEL) || node).setHTML(label);
+            (node.one('.' + ButtonCore.CLASS_NAMES.LABEL) || node).set('text', label);
         }
 
         return label;
@@ -179,10 +171,10 @@ ButtonCore.prototype = {
      */
     _uiSetDisabled: function(value) {
         var node = this.getNode();
-
+        
         node.getDOMNode().disabled = value; // avoid rerunning setter when this === node
         node.toggleClass(ButtonCore.CLASS_NAMES.DISABLED, value);
-
+        
         return value;
     }
 };
@@ -204,10 +196,9 @@ ButtonCore.ATTRS = {
      * The text of the button (the `value` or `text` property)
      *
      * @attribute label
-     * @type {HTML|String}
+     * @type String
      */
     label: {
-        valueFn: '_getLabel',
         setter: '_uiSetLabel',
         getter: '_getLabel',
         lazyAdd: false
@@ -279,6 +270,5 @@ ButtonCore.ARIA_ROLES = {
 
 // Export Button
 Y.ButtonCore = ButtonCore;
-
 
 }, '@VERSION@', {"requires": ["attribute-core", "classnamemanager", "node-base"]});
