@@ -377,7 +377,7 @@ var WIDGET       = 'widget',
         _blockIFrameFocus: function() {
             var bb = this.get(BOUNDING_BOX);
 
-            Y.all('iframe').each(function(bb) {
+            Y.all('iframe').each(function() {
                 if (!bb.contains(this)) {
                     this.setData('previous-tab-index', this.get('tabIndex'));
                     this.set('tabIndex', -1);
