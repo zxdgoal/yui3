@@ -376,9 +376,13 @@ var WIDGET       = 'widget',
          * @protected
          */
         _blockIFrameFocus: function() {
-            Y.all('iframe').each(function() {
-                this.setAttribute('data-tabindex', this.get('tabIndex'));
-                this.set('tabIndex', -1);
+            var bb = this.get(BOUNDING_BOX);
+
+            Y.all('iframe').each(function(bb) {
+                if (!bb.contains(this)) {
+                    this.setAttribute('data-tabindex', this.get('tabIndex'));
+                    this.set('tabIndex', -1);
+                }
             });
         },
 
