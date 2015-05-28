@@ -379,7 +379,7 @@ var WIDGET       = 'widget',
 
             Y.all('iframe').each(function() {
                 if (!bb.contains(this)) {
-                    this.setData('previous-tab-index', this.get('tabIndex'));
+                    this.setAttribute('data-tabindex', this.get('tabIndex'));
                     this.set('tabIndex', -1);
                 }
             });
@@ -394,8 +394,9 @@ var WIDGET       = 'widget',
          */
         _unblockIFrameFocus: function() {
             Y.all('iframe').each(function() {
-                if (this.getData('previous-tab-index') !== undefined) {
-                    this.set('tabIndex', this.getData('previous-tab-index'));
+                if (this.hasAttribute('data-tabindex')) {
+                    this.set('tabIndex', this.getAttribute('data-tabindex'));
+                    this.removeAttribute('data-tabindex');
                 }
             });
         },
