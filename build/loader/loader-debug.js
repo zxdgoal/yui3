@@ -3415,6 +3415,8 @@ Y.mix(YUI.Env[Y.version].modules, {
     },
     "calendar-base": {
         "lang": [
+            "ca",
+            "ca-ES",
             "de",
             "en",
             "es",
@@ -5864,7 +5866,7 @@ Y.mix(YUI.Env[Y.version].modules, {
         ]
     }
 });
-YUI.Env[Y.version].md5 = 'b48f48e0499b41d980deaefd4100d336';
+YUI.Env[Y.version].md5 = '94eaab0b04a610b83357bad25d126691';
 
 
 }, '@VERSION@', {"requires": ["loader-base"]});
