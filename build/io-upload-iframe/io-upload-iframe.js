@@ -73,7 +73,7 @@ Y.mix(Y.IO.prototype, {
             var name = _d(m[i].substring(m[i].lastIndexOf('&') + 1));
             var input = f.one('input[name=' + name + ']');
 
-            if(!input){
+            if (!input) {
                 o[i] = d.createElement('input');
                 o[i].type = 'hidden';
                 o[i].name = name;
