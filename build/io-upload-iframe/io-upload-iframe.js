@@ -71,7 +71,7 @@ Y.mix(Y.IO.prototype, {
 
         for (i = 0, l = m.length - 1; i < l; i++) {
             var name = _d(m[i].substring(m[i].lastIndexOf('&') + 1));
-            var input = f.one('input[name=' + name + ']');
+            var input = d.getElementsByName(name)[0];
 
             if (!input) {
                 o[i] = d.createElement('input');
