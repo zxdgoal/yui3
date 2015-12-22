@@ -71,7 +71,7 @@ Y.mix(Y.IO.prototype, {
 
         for (i = 0, l = m.length - 1; i < l; i++) {
             var name = _d(m[i].substring(m[i].lastIndexOf('&') + 1));
-            var input = d.getElementsByName(name)[0];
+            var input = f.elements[name];
 
             if (!input) {
                 o[i] = d.createElement('input');
@@ -234,7 +234,7 @@ Y.mix(Y.IO.prototype, {
     */
     _upload: function(o, uri, c) {
         var io = this,
-            f = (typeof c.form.id === 'string') ? d.getElementById(c.form.id) : c.form.id,
+            f = (typeof c.form.id === 'string') ? d.getElementById(c.form.id) : Y.Node.getDOMNode(c.form.id),
             fields;
 
         // Initialize the HTML form properties in case they are
