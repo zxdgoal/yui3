@@ -272,7 +272,8 @@ var Selector = {
     },
 
     test: function(node, selector, root) {
-        var ret = false,
+        var defaultId,
+            ret = false,
             useFrag = false,
             groups,
             parent,
@@ -304,6 +305,7 @@ var Selector = {
 
                 id = Y.Selector._escapeId(Y.DOM.getId(node));
                 if (!id) {
+                    defaultId = true;
                     id = Y.guid();
                     Y.DOM.setId(node, id);
                 }
@@ -325,6 +327,10 @@ var Selector = {
 
                 if (useFrag) { // cleanup
                     frag.removeChild(node);
+                }
+
+                if (defaultId) {
+                    node.removeAttribute('id');
                 }
             };
         }
