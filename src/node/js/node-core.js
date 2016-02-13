@@ -282,7 +282,7 @@ Y_Node.one = function(node) {
             if (!node) {
                 return null; // NOTE: return
             }
-        } else if (node.getDOMNode && node instanceof Y_Node) {
+        } else if (node.getDOMNode && Y.instanceOf(node, Y_Node)) {
             return node; // NOTE: return
         }
 
